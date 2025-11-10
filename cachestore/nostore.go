@@ -10,13 +10,8 @@ type Nostore struct {
 	Cachestore
 }
 
-func (n Nostore) GetEntities(_ context.Context, keys []datastore.Key) (map[datastore.Key][]datastore.Property, error) {
-	// 空のmapを返す
-	m := make(map[datastore.Key][]datastore.Property)
-	for _, key := range keys {
-		m[key] = nil
-	}
-	return m, nil
+func (n Nostore) GetEntities(_ context.Context, _ []datastore.Key) (map[datastore.Key][]datastore.Property, error) {
+	return make(map[datastore.Key][]datastore.Property), nil
 }
 
 func (n Nostore) SetEntities(_ context.Context, _ map[datastore.Key][]datastore.Property) error {
