@@ -30,3 +30,6 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+/aememcachestore/test/
+/service-account-key.json
+/.idea/copilot.data.migration.*.xml
