@@ -92,7 +92,8 @@ func TestDeleteAll(t *testing.T) {
 
 func TestGetEntity_datastoreから取得(t *testing.T) {
 	ctx := context.Background()
-	DefaultTestInitialize(ctx, nil)
+	cs := &cachestore.Memorystore{}
+	DefaultTestInitialize(ctx, cs)
 
 	stored := TestEntity{
 		Id:    1,
@@ -107,6 +108,8 @@ func TestGetEntity_datastoreから取得(t *testing.T) {
 	err = GetEntity(ctx, &e)
 	require.Nil(t, err)
 	require.Equal(t, stored.Value, e.Value)
+
+	require.Len(t, cs.Cache, 1)
 }
 
 func TestGetEntity_キャッシュから取得(t *testing.T) {
@@ -252,6 +255,54 @@ func TestGetEntityMulti_datastoreとcacheから取得(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, stored1.Value, es[0].Value)
 	require.Equal(t, stored2.Value, es[1].Value)
+
+	require.Len(t, cs.Cache, 2)
+}
+
+func TestGetEntityMulti_datastoreとcacheから取得し取得出来なかったものもある(t *testing.T) {
+	ctx := context.Background()
+	cs := &cachestore.Memorystore{}
+	DefaultTestInitialize(ctx, cs)
+
+	stored1 := TestEntity{
+		Id:    1,
+		Value: "Test Value",
+	}
+	ps1, err := datastore.SaveStruct(&stored1)
+	require.Nil(t, err)
+	stored2 := TestEntity{
+		Id:    2,
+		Value: "Test Value 2",
+	}
+
+	err = cs.SetEntities(ctx, map[datastore.Key][]datastore.Property{
+		*stored1.Key(): ps1,
+	})
+	require.Nil(t, err)
+	_, err = client.Put(ctx, stored2.Key(), &stored2)
+
+	es := []*TestEntity{
+		{
+			Id: 1,
+		},
+		{
+			Id: 2,
+		},
+		{
+			Id: 999,
+		},
+	}
+	err = GetEntityMulti(ctx, es)
+	require.NotNil(t, err)
+	merr := err.(datastore.MultiError)
+	require.Len(t, merr, 3)
+	require.Nil(t, merr[0])
+	require.Nil(t, merr[1])
+	require.Equal(t, datastore.ErrNoSuchEntity, merr[2])
+
+	require.Equal(t, stored1.Value, es[0].Value)
+	require.Equal(t, stored2.Value, es[1].Value)
+	require.Equal(t, "", es[2].Value)
 
 	require.Len(t, cs.Cache, 2)
 }

@@ -108,7 +108,14 @@ func GetEntity[E Entity](ctx context.Context, e E) error {
 		LoadStruct(ps, e)
 		return nil
 	}
-	return client.Get(ctx, e.Key(), e)
+	err = client.Get(ctx, e.Key(), e)
+	if err != nil {
+		return err
+	}
+	// キャッシュ
+	return cache.SetEntities(ctx, map[datastore.Key][]datastore.Property{
+		*e.Key(): EntityToProperties(e),
+	})
 }
 
 func GetEntityMulti[E Entity](ctx context.Context, es []E) error {
@@ -156,10 +163,7 @@ func GetEntityMulti[E Entity](ctx context.Context, es []E) error {
 		noCacheKeys := make([]*datastore.Key, 0, len(es))
 		noCaches := make([]E, 0, len(es))
 		for _, e := range es {
-			if ps, ok := cached[*e.Key()]; ok {
-				// キャッシュにあった分をセット
-				LoadStruct(ps, e)
-			} else {
+			if _, ok := cached[*e.Key()]; !ok {
 				noCacheKeys = append(noCacheKeys, e.Key())
 				noCaches = append(noCaches, e)
 			}
@@ -169,7 +173,9 @@ func GetEntityMulti[E Entity](ctx context.Context, es []E) error {
 		if IsProbrem(err) {
 			return err
 		}
+		noerr := false
 		if err == nil {
+			noerr = true
 			err = make(datastore.MultiError, len(noCaches))
 		}
 		// 結果を元のスライスにセット
@@ -184,13 +190,17 @@ func GetEntityMulti[E Entity](ctx context.Context, es []E) error {
 						hits[*es[p].Key()] = EntityToProperties(es[i])
 						break
 					} else {
-						merr[i] = e
+						merr[p] = e
 					}
 				}
 			}
 		}
 		// キャッシュ
-		return cache.SetEntities(ctx, hits)
+		_ = cache.SetEntities(ctx, hits)
+		if noerr {
+			return nil
+		}
+		return merr
 	}
 }
 
