@@ -2,6 +2,8 @@ package entitystore
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 
 	"cloud.google.com/go/datastore"
 	"github.com/samber/lo"
@@ -9,9 +11,13 @@ import (
 	"go.fujikura.biz/entitystore/cachestore"
 )
 
+const LogFormat = "[entitystore] %s"
+
 var client *datastore.Client
 
 var cache cachestore.Cachestore = cachestore.Nostore{}
+
+var logger *slog.Logger
 
 func Client() *datastore.Client {
 	return client
@@ -69,10 +75,15 @@ func Initialize(ctx context.Context, projectId string, conf Config) {
 		panic(err)
 	}
 
-	if conf.Cachestore != nil {
-		cache = conf.Cachestore
-	} else {
+	if conf.Cachestore == nil {
 		cache = cachestore.Nostore{}
+	} else {
+		cache = conf.Cachestore
+	}
+	if conf.Logger == nil {
+		logger = slog.Default()
+	} else {
+		logger = conf.Logger
 	}
 }
 
@@ -101,21 +112,34 @@ func DeleteAll(ctx context.Context, kind string) error {
 
 func GetEntity[E Entity](ctx context.Context, e E) error {
 	cached, err := cache.GetEntities(ctx, []datastore.Key{*e.Key()})
-	if err != nil {
-		return err
-	}
-	if ps, ok := cached[*e.Key()]; ok {
-		LoadStruct(ps, e)
-		return nil
+	if err == nil {
+		if ps, ok := cached[*e.Key()]; ok {
+			LoadStruct(ps, e)
+			return nil
+		}
+	} else {
+		// キャッシュのエラーは警告ログを出すだけにする
+		logger.Warn(
+			fmt.Sprintf(LogFormat, "GetEntity cache.GetEntities error: %v"),
+			slog.String("key", e.Key().String()),
+		)
 	}
 	err = client.Get(ctx, e.Key(), e)
-	if err != nil {
+	if IsProbrem(err) {
 		return err
 	}
 	// キャッシュ
-	return cache.SetEntities(ctx, map[datastore.Key][]datastore.Property{
+	cacheErr := cache.SetEntities(ctx, map[datastore.Key][]datastore.Property{
 		*e.Key(): EntityToProperties(e),
 	})
+	if cacheErr != nil {
+		// キャッシュのエラーは警告ログを出すだけにする
+		logger.Warn(
+			fmt.Sprintf(LogFormat, "GetEntity cache.SetEntities error: %v"),
+			slog.String("key", e.Key().String()),
+		)
+	}
+	return err
 }
 
 func GetEntityMulti[E Entity](ctx context.Context, es []E) error {
@@ -124,20 +148,26 @@ func GetEntityMulti[E Entity](ctx context.Context, es []E) error {
 		return *e.Key()
 	})
 	cached, err := cache.GetEntities(ctx, keys)
-	if err != nil {
-		return err
-	}
-	// キャッシュにあった分をセット
-	for _, e := range es {
-		if ps, ok := cached[*e.Key()]; ok {
-			LoadStruct(ps, e)
+	if err == nil {
+		// キャッシュにあった分をセット
+		for _, e := range es {
+			if ps, ok := cached[*e.Key()]; ok {
+				LoadStruct(ps, e)
+			}
 		}
+		if len(cached) == len(es) {
+			// すべてキャッシュにあった場合は終了
+			return nil
+		}
+	} else {
+		// キャッシュのエラーは警告ログを出すだけにする
+		logger.Warn(
+			fmt.Sprintf(LogFormat, "GetEntityMulti cache.GetEntities error: %v"),
+		)
 	}
-	if len(cached) == len(es) {
-		// すべてキャッシュにあった場合は終了
-		return nil
-	}
+	noerr := false
 	var merr datastore.MultiError
+	var hits map[datastore.Key][]datastore.Property
 	if len(cached) == 0 {
 		// まったくキャッシュに無かった場合、全て Datastore から取得
 		keys := lo.Map(es, func(e E, _ int) *datastore.Key {
@@ -148,16 +178,16 @@ func GetEntityMulti[E Entity](ctx context.Context, es []E) error {
 			return err
 		}
 		if err == nil {
+			noerr = true
 			err = make(datastore.MultiError, len(es))
 		}
-		// キャッシュ
-		hits := make(map[datastore.Key][]datastore.Property, len(es))
+		// キャッシュするデータを準備
+		hits = make(map[datastore.Key][]datastore.Property, len(es))
 		for i, e := range err.(datastore.MultiError) {
 			if e == nil {
 				hits[*es[i].Key()] = EntityToProperties(es[i])
 			}
 		}
-		return cache.SetEntities(ctx, hits)
 	} else {
 		// 一部キャッシュにあった場合
 		noCacheKeys := make([]*datastore.Key, 0, len(es))
@@ -173,14 +203,13 @@ func GetEntityMulti[E Entity](ctx context.Context, es []E) error {
 		if IsProbrem(err) {
 			return err
 		}
-		noerr := false
 		if err == nil {
 			noerr = true
 			err = make(datastore.MultiError, len(noCaches))
 		}
 		// 結果を元のスライスにセット
 		merr = make(datastore.MultiError, len(es))
-		hits := make(map[datastore.Key][]datastore.Property, len(es))
+		hits = make(map[datastore.Key][]datastore.Property, len(es))
 		p := 0
 		for i, e := range err.(datastore.MultiError) {
 			for ; p < len(es); p++ {
@@ -195,13 +224,19 @@ func GetEntityMulti[E Entity](ctx context.Context, es []E) error {
 				}
 			}
 		}
-		// キャッシュ
-		_ = cache.SetEntities(ctx, hits)
-		if noerr {
-			return nil
-		}
-		return merr
 	}
+	// キャッシュ
+	cacheErr := cache.SetEntities(ctx, hits)
+	if cacheErr != nil {
+		// キャッシュのエラーは警告ログを出すだけにする
+		logger.Warn(
+			fmt.Sprintf(LogFormat, "GetEntityMulti cache.SetEntities error: %v"),
+		)
+	}
+	if noerr {
+		return nil
+	}
+	return merr
 }
 
 func PutEntity[E Entity](ctx context.Context, e E) error {

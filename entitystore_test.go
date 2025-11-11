@@ -2,6 +2,8 @@ package entitystore
 
 import (
 	"context"
+	"log/slog"
+	"os"
 	"testing"
 
 	"cloud.google.com/go/datastore"
@@ -26,6 +28,10 @@ func TestInitialize_デフォルトデータベース(t *testing.T) {
 	err := client.Get(ctx, datastore.NameKey("NewClientCheck", "NewClientCheck", nil), &check)
 	require.Nil(t, err)
 	require.Equal(t, "Default Database", check.Value)
+
+	// 他の設定(デフォルト)確認
+	require.Equal(t, cache, cachestore.Nostore{})
+	require.Equal(t, slog.Default(), logger)
 }
 
 func TestInitialize_データベース指定(t *testing.T) {
@@ -57,6 +63,19 @@ func TestInitialize_キャッシュストア指定(t *testing.T) {
 
 	require.NotEqual(t, cache, cachestore.Nostore{})
 	require.Equal(t, cache, TestCachestore{})
+}
+
+func TestInitialize_ロガー指定(t *testing.T) {
+	ctx := context.Background()
+	testLogger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+	Initialize(ctx, "entitystore-test-project", Config{
+		Options: []option.ClientOption{
+			option.WithCredentialsFile("service-account-key.json"),
+		},
+		Logger: testLogger,
+	})
+
+	require.Equal(t, testLogger, logger)
 }
 
 func TestDeleteAll(t *testing.T) {
