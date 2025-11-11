@@ -28,6 +28,17 @@ func (e *TestEntity) Key() *datastore.Key {
 	return datastore.NameKey("TestEntity", strconv.Itoa(e.Id), nil)
 }
 
+type AggregationTestEntity struct {
+	EntityBase
+	Id     int
+	Value  int
+	Value2 float64
+}
+
+func (e *AggregationTestEntity) Key() *datastore.Key {
+	return datastore.NameKey("AggregationTestEntity", strconv.Itoa(e.Id), nil)
+}
+
 func DefaultTestInitialize(ctx context.Context, cs cachestore.Cachestore) {
 	Initialize(ctx, "entitystore-test-project", Config{
 		Options: []option.ClientOption{
@@ -35,5 +46,8 @@ func DefaultTestInitialize(ctx context.Context, cs cachestore.Cachestore) {
 		},
 		Cachestore: cs,
 	})
-	DeleteAll(ctx, "TestEntity")
+	err := DeleteAll(ctx, "TestEntity")
+	if err != nil {
+		panic(err)
+	}
 }

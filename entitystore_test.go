@@ -2,6 +2,7 @@ package entitystore
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"os"
 	"testing"
@@ -313,7 +314,8 @@ func TestGetEntityMulti_datastoreとcacheから取得し取得出来なかった
 	}
 	err = GetEntityMulti(ctx, es)
 	require.NotNil(t, err)
-	merr := err.(datastore.MultiError)
+	var merr datastore.MultiError
+	errors.As(err, &merr)
 	require.Len(t, merr, 3)
 	require.Nil(t, merr[0])
 	require.Nil(t, merr[1])
@@ -324,4 +326,247 @@ func TestGetEntityMulti_datastoreとcacheから取得し取得出来なかった
 	require.Equal(t, "", es[2].Value)
 
 	require.Len(t, cs.Cache, 2)
+}
+
+func TestPutEntity(t *testing.T) {
+	ctx := context.Background()
+	cs := &cachestore.Memorystore{}
+	DefaultTestInitialize(ctx, cs)
+
+	stored1 := TestEntity{
+		Id:    1,
+		Value: "Test Old Value",
+	}
+	ps1, err := datastore.SaveStruct(&stored1)
+	require.Nil(t, err)
+	stored2 := TestEntity{
+		Id:    2,
+		Value: "Test Old Value 2",
+	}
+	ps2, err := datastore.SaveStruct(&stored2)
+	require.Nil(t, err)
+
+	err = cs.SetEntities(ctx, map[datastore.Key][]datastore.Property{
+		*stored1.Key(): ps1,
+		*stored2.Key(): ps2,
+	})
+	require.Nil(t, err)
+	require.Len(t, cs.Cache, 2)
+
+	err = PutEntity(ctx, &TestEntity{
+		Id:    1,
+		Value: "Test Value",
+	})
+	require.Nil(t, err)
+	require.Len(t, cs.Cache, 1)
+
+	e := TestEntity{
+		Id: 1,
+	}
+	err = GetEntity(ctx, &e)
+	require.Nil(t, err)
+	require.Equal(t, "Test Value", e.Value)
+}
+
+func TestPutEntityMulti(t *testing.T) {
+	ctx := context.Background()
+	cs := &cachestore.Memorystore{}
+	DefaultTestInitialize(ctx, cs)
+
+	stored1 := TestEntity{
+		Id:    1,
+		Value: "Test Old Value",
+	}
+	ps1, err := datastore.SaveStruct(&stored1)
+	require.Nil(t, err)
+	stored2 := TestEntity{
+		Id:    2,
+		Value: "Test Old Value 2",
+	}
+	ps2, err := datastore.SaveStruct(&stored2)
+	require.Nil(t, err)
+
+	err = cs.SetEntities(ctx, map[datastore.Key][]datastore.Property{
+		*stored1.Key(): ps1,
+		*stored2.Key(): ps2,
+	})
+	require.Nil(t, err)
+	require.Len(t, cs.Cache, 2)
+
+	err = PutEntityMulti(ctx, []*TestEntity{
+		{
+			Id:    1,
+			Value: "Test Value",
+		},
+		{
+			Id:    3,
+			Value: "Test Value 3",
+		},
+	})
+	require.Nil(t, err)
+	require.Len(t, cs.Cache, 1)
+
+	e := TestEntity{
+		Id: 1,
+	}
+	err = GetEntity(ctx, &e)
+	require.Nil(t, err)
+	require.Equal(t, "Test Value", e.Value)
+	e = TestEntity{
+		Id: 3,
+	}
+	err = GetEntity(ctx, &e)
+	require.Nil(t, err)
+	require.Equal(t, "Test Value 3", e.Value)
+}
+
+func TestDeleteEntity(t *testing.T) {
+	ctx := context.Background()
+	cs := &cachestore.Memorystore{}
+	DefaultTestInitialize(ctx, cs)
+
+	stored1 := TestEntity{
+		Id:    1,
+		Value: "Test Value",
+	}
+	ps1, err := datastore.SaveStruct(&stored1)
+	require.Nil(t, err)
+	stored2 := TestEntity{
+		Id:    2,
+		Value: "Test Value 2",
+	}
+	ps2, err := datastore.SaveStruct(&stored2)
+	require.Nil(t, err)
+
+	err = PutEntityMulti(ctx, []*TestEntity{&stored1, &stored2})
+	require.Nil(t, err)
+
+	err = cs.SetEntities(ctx, map[datastore.Key][]datastore.Property{
+		*stored1.Key(): ps1,
+		*stored2.Key(): ps2,
+	})
+	require.Nil(t, err)
+	require.Len(t, cs.Cache, 2)
+
+	err = DeleteEntity(ctx, &TestEntity{
+		Id: 1,
+	})
+	require.Nil(t, err)
+	require.Len(t, cs.Cache, 1)
+
+	err = GetEntity(ctx, &TestEntity{
+		Id: 1,
+	})
+	require.Equal(t, datastore.ErrNoSuchEntity, err)
+}
+
+func TestDeleteEntityMulti(t *testing.T) {
+	ctx := context.Background()
+	cs := &cachestore.Memorystore{}
+	DefaultTestInitialize(ctx, cs)
+
+	stored1 := TestEntity{
+		Id:    1,
+		Value: "Test Value",
+	}
+	ps1, err := datastore.SaveStruct(&stored1)
+	require.Nil(t, err)
+	stored2 := TestEntity{
+		Id:    2,
+		Value: "Test Value 2",
+	}
+	ps2, err := datastore.SaveStruct(&stored2)
+	require.Nil(t, err)
+
+	err = PutEntityMulti(ctx, []*TestEntity{&stored1, &stored2})
+	require.Nil(t, err)
+
+	err = cs.SetEntities(ctx, map[datastore.Key][]datastore.Property{
+		*stored1.Key(): ps1,
+		*stored2.Key(): ps2,
+	})
+	require.Nil(t, err)
+	require.Len(t, cs.Cache, 2)
+
+	err = DeleteEntityMulti(ctx, []*TestEntity{
+		{
+			Id: 1,
+		},
+		{
+			Id: 2,
+		},
+	})
+	require.Nil(t, err)
+	require.Len(t, cs.Cache, 0)
+
+	err = GetEntity(ctx, &TestEntity{
+		Id: 1,
+	})
+	require.Equal(t, datastore.ErrNoSuchEntity, err)
+	err = GetEntity(ctx, &TestEntity{
+		Id: 2,
+	})
+	require.Equal(t, datastore.ErrNoSuchEntity, err)
+}
+
+func TestGetEntityAll(t *testing.T) {
+	ctx := context.Background()
+	cs := &cachestore.Memorystore{}
+	DefaultTestInitialize(ctx, cs)
+
+	stored1 := TestEntity{
+		Id:    1,
+		Value: "Test Value",
+	}
+	ps1, err := datastore.SaveStruct(&stored1)
+	require.Nil(t, err)
+	stored2 := TestEntity{
+		Id:    2,
+		Value: "Test Value 2",
+	}
+
+	err = PutEntityMulti(ctx, []*TestEntity{&stored1, &stored2})
+	require.Nil(t, err)
+
+	err = cs.SetEntities(ctx, map[datastore.Key][]datastore.Property{
+		*stored1.Key(): ps1,
+	})
+	require.Nil(t, err)
+	require.Len(t, cs.Cache, 1)
+
+	q := datastore.NewQuery("TestEntity").Order("Id")
+	var es []*TestEntity
+	err = GetEntityAll(ctx, q, &es)
+	require.Nil(t, err)
+	require.Len(t, es, 2)
+	require.Equal(t, stored1.Value, es[0].Value)
+	require.Equal(t, stored2.Value, es[1].Value)
+
+	require.Len(t, cs.Cache, 2)
+}
+
+func TestGetEntityFirst(t *testing.T) {
+	ctx := context.Background()
+	cs := &cachestore.Memorystore{}
+	DefaultTestInitialize(ctx, cs)
+
+	stored1 := TestEntity{
+		Id:    1,
+		Value: "Test Value",
+	}
+	stored2 := TestEntity{
+		Id:    2,
+		Value: "Test Value 2",
+	}
+
+	err := PutEntityMulti(ctx, []*TestEntity{&stored1, &stored2})
+	require.Nil(t, err)
+
+	q := datastore.NewQuery("TestEntity").Order("-Id")
+	var e TestEntity
+	err = GetEntityFirst(ctx, q, &e)
+	require.Nil(t, err)
+	require.Equal(t, stored2.Value, e.Value)
+
+	require.Len(t, cs.Cache, 1)
 }

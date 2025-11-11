@@ -2,8 +2,9 @@ package entitystore
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"log/slog"
+	"reflect"
 
 	"cloud.google.com/go/datastore"
 	"github.com/samber/lo"
@@ -19,14 +20,15 @@ var cache cachestore.Cachestore = cachestore.Nostore{}
 
 var logger *slog.Logger
 
+//goland:noinspection GoUnusedExportedFunction
 func Client() *datastore.Client {
 	return client
 }
 
-func EntityToProperties[E Entity](e E) []datastore.Property {
+func EntityToProperties(e any) []datastore.Property {
 	var ps []datastore.Property
 	var err error
-	if ls, ok := any(e).(datastore.PropertyLoadSaver); ok {
+	if ls, ok := e.(datastore.PropertyLoadSaver); ok {
 		ps, err = ls.Save()
 	} else {
 		ps, err = datastore.SaveStruct(e)
@@ -37,23 +39,28 @@ func EntityToProperties[E Entity](e E) []datastore.Property {
 	return ps
 }
 
-func LoadStruct[E Entity](ps []datastore.Property, e E) {
-	if ls, ok := any(e).(datastore.PropertyLoadSaver); ok {
-		ls.Load(ps)
+func LoadStruct(ps []datastore.Property, e any) {
+	var err error
+	if ls, ok := e.(datastore.PropertyLoadSaver); ok {
+		err = ls.Load(ps)
 	} else {
-		datastore.LoadStruct(e, ps)
+		err = datastore.LoadStruct(e, ps)
+	}
+	if err != nil {
+		panic(err)
 	}
 }
 
 // IsProbrem err が ErrNoSuchEntity 以外でかつ ErrNoSuchEntity しか含まない MultiError でも無い場合に True を返す
 // noinspection GoUnusedExportedFunction
 func IsProbrem(err error) bool {
-	if err == nil || err == datastore.ErrNoSuchEntity {
+	var merr datastore.MultiError
+	if err == nil || errors.Is(err, datastore.ErrNoSuchEntity) {
 		return false // ErrNoSuchEntity は問題無い
-	} else if merr, ok := err.(datastore.MultiError); ok {
+	} else if errors.As(err, &merr) {
 		// MultiError の処理
 		for _, e := range merr {
-			if e != nil && e != datastore.ErrNoSuchEntity {
+			if e != nil && !errors.Is(e, datastore.ErrNoSuchEntity) {
 				return true // MultiError に ErrNoSuchEntity 以外が含まれているなら問題あり
 			}
 		}
@@ -111,200 +118,73 @@ func DeleteAll(ctx context.Context, kind string) error {
 }
 
 func GetEntity[E Entity](ctx context.Context, e E) error {
-	cached, err := cache.GetEntities(ctx, []datastore.Key{*e.Key()})
-	if err == nil {
-		if ps, ok := cached[*e.Key()]; ok {
-			LoadStruct(ps, e)
-			return nil
-		}
-	} else {
-		// キャッシュのエラーは警告ログを出すだけにする
-		logger.Warn(
-			fmt.Sprintf(LogFormat, "GetEntity cache.GetEntities error: %v"),
-			slog.String("key", e.Key().String()),
-		)
-	}
-	err = client.Get(ctx, e.Key(), e)
-	if IsProbrem(err) {
-		return err
-	}
-	// キャッシュ
-	cacheErr := cache.SetEntities(ctx, map[datastore.Key][]datastore.Property{
-		*e.Key(): EntityToProperties(e),
-	})
-	if cacheErr != nil {
-		// キャッシュのエラーは警告ログを出すだけにする
-		logger.Warn(
-			fmt.Sprintf(LogFormat, "GetEntity cache.SetEntities error: %v"),
-			slog.String("key", e.Key().String()),
-		)
-	}
-	return err
+	return Get(ctx, e.Key(), e)
 }
 
 func GetEntityMulti[E Entity](ctx context.Context, es []E) error {
-	// キャッシュから取得
-	keys := lo.Map(es, func(e E, _ int) datastore.Key {
-		return *e.Key()
+	keys := lo.Map(es, func(e E, _ int) *datastore.Key {
+		return e.Key()
 	})
-	cached, err := cache.GetEntities(ctx, keys)
-	if err == nil {
-		// キャッシュにあった分をセット
-		for _, e := range es {
-			if ps, ok := cached[*e.Key()]; ok {
-				LoadStruct(ps, e)
-			}
-		}
-		if len(cached) == len(es) {
-			// すべてキャッシュにあった場合は終了
-			return nil
-		}
-	} else {
-		// キャッシュのエラーは警告ログを出すだけにする
-		logger.Warn(
-			fmt.Sprintf(LogFormat, "GetEntityMulti cache.GetEntities error: %v"),
-		)
+	anys := make([]any, len(es))
+	for i, e := range es {
+		anys[i] = e
 	}
-	noerr := false
-	var merr datastore.MultiError
-	var hits map[datastore.Key][]datastore.Property
-	if len(cached) == 0 {
-		// まったくキャッシュに無かった場合、全て Datastore から取得
-		keys := lo.Map(es, func(e E, _ int) *datastore.Key {
-			return e.Key()
-		})
-		err = client.GetMulti(ctx, keys, es)
-		if IsProbrem(err) {
-			return err
-		}
-		if err == nil {
-			noerr = true
-			err = make(datastore.MultiError, len(es))
-		}
-		// キャッシュするデータを準備
-		hits = make(map[datastore.Key][]datastore.Property, len(es))
-		for i, e := range err.(datastore.MultiError) {
-			if e == nil {
-				hits[*es[i].Key()] = EntityToProperties(es[i])
-			}
-		}
-	} else {
-		// 一部キャッシュにあった場合
-		noCacheKeys := make([]*datastore.Key, 0, len(es))
-		noCaches := make([]E, 0, len(es))
-		for _, e := range es {
-			if _, ok := cached[*e.Key()]; !ok {
-				noCacheKeys = append(noCacheKeys, e.Key())
-				noCaches = append(noCaches, e)
-			}
-		}
-		// キャッシュに無いものだけ Datastore から取得
-		err = client.GetMulti(ctx, noCacheKeys, noCaches)
-		if IsProbrem(err) {
-			return err
-		}
-		if err == nil {
-			noerr = true
-			err = make(datastore.MultiError, len(noCaches))
-		}
-		// 結果を元のスライスにセット
-		merr = make(datastore.MultiError, len(es))
-		hits = make(map[datastore.Key][]datastore.Property, len(es))
-		p := 0
-		for i, e := range err.(datastore.MultiError) {
-			for ; p < len(es); p++ {
-				if *es[p].Key() == *noCacheKeys[i] {
-					if e == nil {
-						es[p] = noCaches[i]
-						hits[*es[p].Key()] = EntityToProperties(es[i])
-						break
-					} else {
-						merr[p] = e
-					}
-				}
-			}
-		}
-	}
-	// キャッシュ
-	cacheErr := cache.SetEntities(ctx, hits)
-	if cacheErr != nil {
-		// キャッシュのエラーは警告ログを出すだけにする
-		logger.Warn(
-			fmt.Sprintf(LogFormat, "GetEntityMulti cache.SetEntities error: %v"),
-		)
-	}
-	if noerr {
-		return nil
-	}
-	return merr
+	return GetMulti(ctx, keys, anys)
 }
 
 func PutEntity[E Entity](ctx context.Context, e E) error {
-	return nil
+	return Put(ctx, e.Key(), e)
 }
 
 func PutEntityMulti[E Entity](ctx context.Context, es []E) error {
-	return nil
+	return PutMulti(ctx, lo.Map(es, func(e E, _ int) *datastore.Key {
+		return e.Key()
+	}), es)
 }
 
 func DeleteEntity[E Entity](ctx context.Context, e E) error {
-	return nil
+	return Delete(ctx, e.Key())
 }
 
 func DeleteEntityMulti[E Entity](ctx context.Context, es []E) error {
-	return nil
+	return DeleteMulti(ctx, lo.Map(es, func(e E, _ int) *datastore.Key {
+		return e.Key()
+	}))
 }
 
-func GetEntityAll[E Entity](ctx context.Context, q datastore.Query, dst []E) error {
-	return nil
-}
-
-func GetEntityFirst[E Entity](ctx context.Context, q datastore.Query, dst E) error {
-	return nil
-}
-
-func MutateEntity(ctx context.Context, muts ...*Mutation) error {
-	_, err := client.Mutate(ctx, lo.Map(muts, func(m *Mutation, _ int) *datastore.Mutation {
-		switch m.Type {
-		case MutationTypeDelete:
-			return datastore.NewDelete(m.Key)
-		case MutationTypeInsert:
-			return datastore.NewInsert(m.Key, m.Entity)
-		case MutationTypeUpdate:
-			return datastore.NewUpdate(m.Key, m.Entity)
-		case MutationTypeUpsert:
-			return datastore.NewUpsert(m.Key, m.Entity)
-		default:
-			panic("unknown mutation type")
-		}
-	})...)
+func GetEntityAll[E Entity](ctx context.Context, q *datastore.Query, dst *[]E) error {
+	keys, err := client.GetAll(ctx, q.KeysOnly(), nil)
 	if err != nil {
 		return err
 	}
-	ents := make(map[datastore.Key][]datastore.Property)
-	for _, m := range muts {
-		if m.Type == MutationTypeDelete {
-			continue
-		}
-		ents[*m.Key] = m.Entity
+	if len(keys) == 0 {
+		return nil
 	}
-	return cache.SetEntities(ctx, ents)
+	*dst = make([]E, len(keys))
+	var e E
+	t := reflect.TypeOf(e)
+	for i := range *dst {
+		var v reflect.Value
+		if t.Kind() == reflect.Ptr {
+			v = reflect.New(t.Elem())
+		} else {
+			v = reflect.Zero(t)
+		}
+		(*dst)[i] = v.Interface().(E)
+	}
+	anys := make([]any, len(*dst))
+	for i, e := range *dst {
+		anys[i] = e
+	}
+	return GetMulti(ctx, keys, anys)
 }
 
-func Run(ctx context.Context, q *datastore.Query) *datastore.Iterator {
-	return client.Run(ctx, q)
-}
-
-func RunInTransaction(ctx context.Context, f func(tx *datastore.Transaction) error, opts ...datastore.TransactionOption) (cmt *datastore.Commit, err error) {
-	return client.RunInTransaction(ctx, f, opts...)
-}
-
-func Count(ctx context.Context, q datastore.Query) (int, error) {
-	return 0, nil
-}
-func Avg(ctx context.Context, q datastore.Query) (float64, error) {
-	return 0, nil
-}
-func Sum(ctx context.Context, q datastore.Query) (float64, error) {
-	return 0, nil
+func GetEntityFirst[E Entity](ctx context.Context, q *datastore.Query, dst E) error {
+	q = q.KeysOnly()
+	it := client.Run(ctx, q.Limit(1))
+	key, err := it.Next(nil)
+	if err != nil {
+		return err
+	}
+	return Get(ctx, key, dst)
 }
