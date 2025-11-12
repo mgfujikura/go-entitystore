@@ -2,6 +2,7 @@ package entitystore
 
 import (
 	"context"
+	"errors"
 
 	"cloud.google.com/go/datastore"
 	"google.golang.org/api/iterator"
@@ -35,13 +36,13 @@ func (l *EntityLister[E]) GetList(ctx context.Context, limit int, cur string) ([
 		q = q.Start(cursor)
 	}
 	itr := client.Run(ctx, q)
-	keys := []*datastore.Key{}
-	ents := []E{}
+	var keys []*datastore.Key
+	var ents []E
 	constructor := entityConstructor(l.e)
 	// キーの取得とエンティティの入れ物の準備
 	for len(keys) < limit { // limit件数分取得
 		key, err := itr.Next(nil)
-		if err == iterator.Done {
+		if errors.Is(err, iterator.Done) {
 			break
 		}
 		if err != nil {
@@ -64,7 +65,7 @@ func (l *EntityLister[E]) GetList(ctx context.Context, limit int, cur string) ([
 		if err != nil {
 			return nil, "", err
 		}
-		if _, err := itr.Next(nil); err != iterator.Done {
+		if _, err := itr.Next(nil); !errors.Is(err, iterator.Done) {
 			newCur = cursor.String() // limit+1件目のエンティティがあるのでカーソルが必要
 		}
 	}
@@ -87,11 +88,11 @@ func (l *EntityLister[E]) GetKeyList(ctx context.Context, limit int, cur string)
 		q = q.Start(cursor)
 	}
 	itr := client.Run(ctx, q)
-	keys := []*datastore.Key{}
+	var keys []*datastore.Key
 	// キーの取得
 	for len(keys) < limit { // limit件数分取得
 		key, err := itr.Next(nil)
-		if err == iterator.Done {
+		if errors.Is(err, iterator.Done) {
 			break
 		}
 		if err != nil {
@@ -110,7 +111,7 @@ func (l *EntityLister[E]) GetKeyList(ctx context.Context, limit int, cur string)
 		if err != nil {
 			return nil, "", err
 		}
-		if _, err := itr.Next(nil); err != iterator.Done {
+		if _, err := itr.Next(nil); !errors.Is(err, iterator.Done) {
 			newCur = cursor.String() // limit+1件目のエンティティがあるのでカーソルが必要
 		}
 	}
