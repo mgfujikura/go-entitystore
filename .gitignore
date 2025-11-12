@@ -33,3 +33,4 @@ go.work.sum
 /aememcachestore/test/
 /service-account-key.json
 /.idea/copilot.data.migration.*.xml
+/.idea/copilotDiffState.xml
