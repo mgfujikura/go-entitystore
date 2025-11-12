@@ -1,0 +1,5 @@
+indexes:
+  - kind: AggregationTestEntity
+    properties:
+      - name: Value
+      - name: Value2

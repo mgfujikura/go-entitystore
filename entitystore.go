@@ -188,3 +188,19 @@ func GetEntityFirst[E Entity](ctx context.Context, q *datastore.Query, dst E) er
 	}
 	return Get(ctx, key, dst)
 }
+
+//goland:noinspection GoUnusedExportedFunction
+func DeleteCacheByEntities[E Entity](ctx context.Context, es []E) error {
+	cacheKeys := lo.Map(es, func(e E, _ int) datastore.Key {
+		return *e.Key()
+	})
+	return cache.DeleteEntities(ctx, cacheKeys)
+}
+
+//goland:noinspection GoUnusedExportedFunction
+func DeleteCacheByKeys(ctx context.Context, keys []*datastore.Key) error {
+	cacheKeys := lo.Map(keys, func(key *datastore.Key, _ int) datastore.Key {
+		return *key
+	})
+	return cache.DeleteEntities(ctx, cacheKeys)
+}

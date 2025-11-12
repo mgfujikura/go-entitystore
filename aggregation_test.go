@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"cloud.google.com/go/datastore"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -37,7 +38,7 @@ func TestAvg(t *testing.T) {
 	require.NoError(t, err)
 
 	q := datastore.NewQuery("AggregationTestEntity").FilterField("Value", ">=", 15)
-	avg, err := Avg(ctx, *q)
+	avg, err := Avg(ctx, *q, "Value")
 	require.NoError(t, err)
 	require.Equal(t, 25.0, avg)
 }
@@ -74,4 +75,25 @@ func TestFloat64Sum(t *testing.T) {
 	sum, err := Float64Sum(ctx, *q, "Value2")
 	require.NoError(t, err)
 	require.Equal(t, 6.0, sum)
+}
+
+func TestAggregation(t *testing.T) {
+	ctx := context.Background()
+	DefaultTestInitialize(ctx, nil)
+
+	err := PutEntityMulti(ctx, []*AggregationTestEntity{
+		{Id: 1, Value: 10, Value2: 1.5},
+		{Id: 2, Value: 20, Value2: 2.5},
+		{Id: 3, Value: 30, Value2: 3.5},
+	})
+	require.NoError(t, err)
+
+	q := datastore.NewQuery("AggregationTestEntity")
+	a := NewAggregation(q).WithCount().WithAvg("Value").WithIntSum("Value").WithFloat64Sum("Value2")
+	err = a.Run(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, 3, a.Count())
+	assert.Equal(t, 20.0, a.Avg("Value"))
+	assert.Equal(t, 60, a.IntSum("Value"))
+	assert.Equal(t, 7.5, a.Float64Sum("Value2"))
 }
