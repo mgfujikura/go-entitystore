@@ -51,9 +51,9 @@ func LoadStruct(ps []datastore.Property, e any) {
 	}
 }
 
-// IsProbrem err が ErrNoSuchEntity 以外でかつ ErrNoSuchEntity しか含まない MultiError でも無い場合に True を返す
+// IsProblem err が ErrNoSuchEntity 以外でかつ ErrNoSuchEntity しか含まない MultiError でも無い場合に True を返す
 // noinspection GoUnusedExportedFunction
-func IsProbrem(err error) bool {
+func IsProblem(err error) bool {
 	var merr datastore.MultiError
 	if err == nil || errors.Is(err, datastore.ErrNoSuchEntity) {
 		return false // ErrNoSuchEntity は問題無い

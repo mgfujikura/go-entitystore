@@ -11,7 +11,7 @@ import (
 
 func Get(ctx context.Context, key *datastore.Key, dst any) error {
 	err := GetMulti(ctx, []*datastore.Key{key}, []any{dst})
-	if IsProbrem(err) {
+	if IsProblem(err) {
 		return err
 	}
 	var merr datastore.MultiError
@@ -50,7 +50,7 @@ func GetMulti(ctx context.Context, keys []*datastore.Key, dst []any) error {
 	if len(cached) == 0 {
 		// まったくキャッシュに無かった場合、全て Datastore から取得
 		err = client.GetMulti(ctx, keys, dst)
-		if IsProbrem(err) {
+		if IsProblem(err) {
 			return err
 		}
 		if err == nil {
@@ -78,7 +78,7 @@ func GetMulti(ctx context.Context, keys []*datastore.Key, dst []any) error {
 		}
 		// キャッシュに無いものだけ Datastore から取得
 		err = client.GetMulti(ctx, noCacheKeys, noCaches)
-		if IsProbrem(err) {
+		if IsProblem(err) {
 			return err
 		}
 		if err == nil {
