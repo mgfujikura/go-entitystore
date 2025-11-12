@@ -9,6 +9,9 @@ import (
 	"github.com/samber/lo"
 )
 
+// Get は単一のエンティティを取得します。
+// キャッシュに存在する場合はキャッシュから取得し、存在しない場合はDatastoreから取得します。
+// 取得後、Datastoreから取得した場合はキャッシュに保存します。
 func Get(ctx context.Context, key *datastore.Key, dst any) error {
 	err := GetMulti(ctx, []*datastore.Key{key}, []any{dst})
 	if IsProblem(err) {
@@ -21,6 +24,9 @@ func Get(ctx context.Context, key *datastore.Key, dst any) error {
 	return nil
 }
 
+// GetMulti は複数のエンティティを取得します。
+// キャッシュに存在するエンティティはキャッシュから取得し、存在しないエンティティはDatastoreから取得します。
+// 取得後、Datastoreから取得したエンティティはキャッシュに保存します。
 func GetMulti(ctx context.Context, keys []*datastore.Key, dst []any) error {
 	// キャッシュから取得
 	cacheKeys := lo.Map(keys, func(key *datastore.Key, _ int) datastore.Key {
@@ -117,6 +123,8 @@ func GetMulti(ctx context.Context, keys []*datastore.Key, dst []any) error {
 	return merr
 }
 
+// Put は単一のエンティティをDatastoreに保存します。
+// 保存後、キャッシュを削除します。
 func Put(ctx context.Context, key *datastore.Key, src any) error {
 	_, err := client.Put(ctx, key, src)
 	if err != nil {
@@ -125,6 +133,8 @@ func Put(ctx context.Context, key *datastore.Key, src any) error {
 	return cache.DeleteEntities(ctx, []datastore.Key{*key})
 }
 
+// PutMulti は複数のエンティティをDatastoreに一括保存します。
+// 保存後、キャッシュを削除します。
 func PutMulti(ctx context.Context, keys []*datastore.Key, src any) error {
 	_, err := client.PutMulti(ctx, keys, src)
 	if err != nil {
@@ -135,6 +145,7 @@ func PutMulti(ctx context.Context, keys []*datastore.Key, src any) error {
 	}))
 }
 
+// Delete は単一のエンティティをDatastoreとキャッシュから削除します。
 func Delete(ctx context.Context, key *datastore.Key) error {
 	err := client.Delete(ctx, key)
 	if err != nil {
@@ -143,6 +154,7 @@ func Delete(ctx context.Context, key *datastore.Key) error {
 	return cache.DeleteEntities(ctx, []datastore.Key{*key})
 }
 
+// DeleteMulti は複数のエンティティをDatastoreとキャッシュから一括削除します。
 func DeleteMulti(ctx context.Context, keys []*datastore.Key) error {
 	err := client.DeleteMulti(ctx, keys)
 	if err != nil {
@@ -153,11 +165,17 @@ func DeleteMulti(ctx context.Context, keys []*datastore.Key) error {
 	}))
 }
 
+// Run は client.Run のラッパーです。
+// 特別な処理は行いません。
+//
 //goland:noinspection GoUnusedExportedFunction
 func Run(ctx context.Context, q *datastore.Query) *datastore.Iterator {
 	return client.Run(ctx, q)
 }
 
+// RunInTransaction は client.RunInTransaction のラッパーです。
+// 特別な処理は行いません。
+//
 //goland:noinspection GoUnusedExportedFunction
 func RunInTransaction(ctx context.Context, f func(tx *datastore.Transaction) error, opts ...datastore.TransactionOption) (cmt *datastore.Commit, err error) {
 	return client.RunInTransaction(ctx, f, opts...)

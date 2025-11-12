@@ -11,6 +11,7 @@ import (
 //goland:noinspection GoUnusedConst
 const DefaultDatabaseId = "(default)"
 
+// Config は entithistore の初期火曜設定のための構造体です。
 type Config struct {
 	DatabaseId string
 	Options    []option.ClientOption

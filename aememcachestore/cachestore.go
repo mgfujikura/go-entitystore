@@ -17,6 +17,7 @@ import (
 var SizeLimit = 950 * 1024 // 950KB
 var Prefix = "DatastoreCache:"
 
+// Cachestore は App Engine Memcache を使用した Cachestore の実装です。
 type Cachestore struct {
 	cachestore.Cachestore
 }

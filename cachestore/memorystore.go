@@ -6,6 +6,9 @@ import (
 	"cloud.google.com/go/datastore"
 )
 
+// Memorystore はメモリ上にエンティティをキャッシュする Cachestore の実装です。
+// テスト用途など、一時的なキャッシュが必要な場合に使用します。
+// Goルーチンセーフではありません。
 type Memorystore struct {
 	Cache map[datastore.Key][]datastore.Property
 	Cachestore

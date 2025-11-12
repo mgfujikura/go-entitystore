@@ -6,6 +6,7 @@ import (
 	"cloud.google.com/go/datastore"
 )
 
+// Nostore はキャッシュを使用しない Cachestore の実装です。
 type Nostore struct {
 	Cachestore
 }

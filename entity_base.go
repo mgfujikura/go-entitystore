@@ -2,6 +2,9 @@ package entitystore
 
 import "time"
 
+// EntityBase は Entity インターフェースの基本実装を提供する構造体です。
+// Key() メソッド以外の Entity インターフェースのメソッドを実装しており、
+// 埋め込みによって利用できます。
 type EntityBase struct {
 	CreatedAtColumn     time.Time `datastore:"CreatedAt"`
 	UpdatedAtColumn     time.Time `datastore:"UpdatedAt"`
