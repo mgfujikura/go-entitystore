@@ -125,10 +125,7 @@ func GetEntityMulti[E Entity](ctx context.Context, es []E) error {
 	keys := lo.Map(es, func(e E, _ int) *datastore.Key {
 		return e.Key()
 	})
-	anys := make([]any, len(es))
-	for i, e := range es {
-		anys[i] = e
-	}
+	anys := toAnySlice(es)
 	return GetMulti(ctx, keys, anys)
 }
 
@@ -162,20 +159,11 @@ func GetEntityAll[E Entity](ctx context.Context, q *datastore.Query, dst *[]E) e
 	}
 	*dst = make([]E, len(keys))
 	var e E
-	t := reflect.TypeOf(e)
+	var constructor = entityConstructor(e)
 	for i := range *dst {
-		var v reflect.Value
-		if t.Kind() == reflect.Ptr {
-			v = reflect.New(t.Elem())
-		} else {
-			v = reflect.Zero(t)
-		}
-		(*dst)[i] = v.Interface().(E)
+		(*dst)[i] = constructor()
 	}
-	anys := make([]any, len(*dst))
-	for i, e := range *dst {
-		anys[i] = e
-	}
+	anys := toAnySlice(*dst)
 	return GetMulti(ctx, keys, anys)
 }
 
@@ -203,4 +191,25 @@ func DeleteCacheByKeys(ctx context.Context, keys []*datastore.Key) error {
 		return *key
 	})
 	return cache.DeleteEntities(ctx, cacheKeys)
+}
+
+func toAnySlice[E any](es []E) []any {
+	anys := make([]any, len(es))
+	for i, e := range es {
+		anys[i] = e
+	}
+	return anys
+}
+
+func entityConstructor[E Entity](e E) func() E {
+	t := reflect.TypeOf(e)
+	return func() E {
+		var v reflect.Value
+		if t.Kind() == reflect.Ptr {
+			v = reflect.New(t.Elem())
+		} else {
+			v = reflect.Zero(t)
+		}
+		return v.Interface().(E)
+	}
 }
