@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"testing"
+	"time"
 
 	"cloud.google.com/go/datastore"
 	"github.com/stretchr/testify/require"
@@ -332,6 +333,12 @@ func TestPutEntity(t *testing.T) {
 	ctx := context.Background()
 	cs := &cachestore.Memorystore{}
 	DefaultTestInitialize(ctx, cs)
+	Now = func() (now time.Time) {
+		return time.Date(2001, 1, 1, 0, 0, 0, 0, time.UTC)
+	}
+	defer func() {
+		Now = time.Now
+	}()
 
 	stored1 := TestEntity{
 		Id:    1,
@@ -366,12 +373,19 @@ func TestPutEntity(t *testing.T) {
 	err = GetEntity(ctx, &e)
 	require.Nil(t, err)
 	require.Equal(t, "Test Value", e.Value)
+	require.Equal(t, time.Date(2001, 1, 1, 0, 0, 0, 0, time.UTC), e.UpdatedAt())
 }
 
 func TestPutEntityMulti(t *testing.T) {
 	ctx := context.Background()
 	cs := &cachestore.Memorystore{}
 	DefaultTestInitialize(ctx, cs)
+	Now = func() (now time.Time) {
+		return time.Date(2001, 1, 1, 0, 0, 0, 0, time.UTC)
+	}
+	defer func() {
+		Now = time.Now
+	}()
 
 	stored1 := TestEntity{
 		Id:    1,
@@ -412,12 +426,14 @@ func TestPutEntityMulti(t *testing.T) {
 	err = GetEntity(ctx, &e)
 	require.Nil(t, err)
 	require.Equal(t, "Test Value", e.Value)
+	require.Equal(t, time.Date(2001, 1, 1, 0, 0, 0, 0, time.UTC), e.UpdatedAt())
 	e = TestEntity{
 		Id: 3,
 	}
 	err = GetEntity(ctx, &e)
 	require.Nil(t, err)
 	require.Equal(t, "Test Value 3", e.Value)
+	require.Equal(t, time.Date(2001, 1, 1, 0, 0, 0, 0, time.UTC), e.UpdatedAt())
 }
 
 func TestDeleteEntity(t *testing.T) {

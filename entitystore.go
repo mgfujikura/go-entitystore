@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"reflect"
+	"time"
 
 	"cloud.google.com/go/datastore"
 	"github.com/samber/lo"
@@ -23,6 +24,9 @@ var cache cachestore.Cachestore = cachestore.Nostore{}
 
 // logger は slog.Logger のインスタンスです。
 var logger *slog.Logger
+
+// Now は現在時刻を取得する関数です。テスト時に差し替え可能にするために変数として定義しています。
+var Now = time.Now
 
 // Client は現在のdatastoreクライアントを返します。
 //
@@ -157,15 +161,25 @@ func GetEntityMulti[E Entity](ctx context.Context, es []E) error {
 // PutEntity は単一のエンティティを保存します。
 // 保存後、キャッシュを削除します。
 func PutEntity[E Entity](ctx context.Context, e E) error {
+	err := e.PrePutAction(ctx)
+	if err != nil {
+		return err
+	}
 	return Put(ctx, e.Key(), e)
 }
 
 // PutEntityMulti は複数のエンティティを一括保存します。
 // 保存後、キャッシュを削除します。
 func PutEntityMulti[E Entity](ctx context.Context, es []E) error {
-	return PutMulti(ctx, lo.Map(es, func(e E, _ int) *datastore.Key {
-		return e.Key()
-	}), es)
+	var keys []*datastore.Key
+	for _, e := range es {
+		err := e.PrePutAction(ctx)
+		if err != nil {
+			return err
+		}
+		keys = append(keys, e.Key())
+	}
+	return PutMulti(ctx, keys, es)
 }
 
 // DeleteEntity は単一のエンティティをDatastoreとキャッシュから削除します。

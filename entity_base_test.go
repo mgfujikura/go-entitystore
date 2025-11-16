@@ -7,14 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestEntityBase_CreatedAtColumn(t *testing.T) {
-	e := &EntityBase{}
-	require.Equal(t, time.Time{}, e.CreatedAt())
-	now := time.Now()
-	e.SetCreatedAt(now)
-	require.Equal(t, now.Truncate(time.Microsecond), e.CreatedAt())
-}
-
 func TestEntityBase_UpdatedAtColumn(t *testing.T) {
 	e := &EntityBase{}
 	require.Equal(t, time.Time{}, e.UpdatedAt())
@@ -33,4 +25,21 @@ func TestEntityBase_SchemaVersionColumn(t *testing.T) {
 func TestEntityBase_CurrentSchemaVersion(t *testing.T) {
 	e := &EntityBase{}
 	require.Equal(t, 0, e.CurrentSchemaVersion())
+}
+
+func TestEntityBase_PrePutAction(t *testing.T) {
+	Now = func() time.Time {
+		return time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)
+	}
+	e := &EntityBase{}
+	e.SchemaVersionColumn = 1
+
+	require.Equal(t, time.Time{}, e.UpdatedAt())
+	require.Equal(t, 1, e.SchemaVersion())
+
+	err := e.PrePutAction(nil)
+	require.NoError(t, err)
+
+	require.Equal(t, Now().Truncate(time.Microsecond), e.UpdatedAt())
+	require.Equal(t, 0, e.SchemaVersion())
 }

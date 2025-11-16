@@ -1,22 +1,16 @@
 package entitystore
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 // EntityBase は Entity インターフェースの基本実装を提供する構造体です。
 // Key() メソッド以外の Entity インターフェースのメソッドを実装しており、
 // 埋め込みによって利用できます。
 type EntityBase struct {
-	CreatedAtColumn     time.Time `datastore:"CreatedAt"`
 	UpdatedAtColumn     time.Time `datastore:"UpdatedAt"`
 	SchemaVersionColumn int       `datastore:"SchemaVersion"`
-}
-
-func (e *EntityBase) SetCreatedAt(t time.Time) {
-	e.CreatedAtColumn = t.Truncate(time.Microsecond)
-}
-
-func (e *EntityBase) CreatedAt() time.Time {
-	return e.CreatedAtColumn
 }
 
 func (e *EntityBase) SetUpdatedAt(t time.Time) {
@@ -37,4 +31,10 @@ func (e *EntityBase) SchemaVersion() int {
 
 func (e *EntityBase) CurrentSchemaVersion() int {
 	return 0
+}
+
+func (e *EntityBase) PrePutAction(_ context.Context) error {
+	e.UpdatedAtColumn = Now().Truncate(time.Microsecond)
+	e.SchemaVersionColumn = e.CurrentSchemaVersion()
+	return nil
 }
