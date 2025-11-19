@@ -3,7 +3,6 @@ package entitystore
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"cloud.google.com/go/datastore"
 	"cloud.google.com/go/datastore/apiv1/datastorepb"
@@ -112,9 +111,7 @@ func (a *Aggregation) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("ar: %#v\n", ar)
 	for k, v := range ar {
-		println(k)
 		cv := v.(*datastorepb.Value)
 		if k[:5] == "isum_" || k == "count" {
 			a.iresuts[k] = int(cv.GetIntegerValue())
