@@ -13,13 +13,40 @@ import (
 // キャッシュに存在する場合はキャッシュから取得し、存在しない場合はDatastoreから取得します。
 // 取得後、Datastoreから取得した場合はキャッシュに保存します。
 func Get(ctx context.Context, key *datastore.Key, dst any) error {
-	err := GetMulti(ctx, []*datastore.Key{key}, []any{dst})
+	// キャッシュから取得
+	cacheKeys := []datastore.Key{*key}
+	cached, err := cache.GetEntities(ctx, cacheKeys)
+	if err == nil {
+		// キャッシュにあった場合はそれを返す
+		if len(cached) > 0 {
+			if ps, ok := cached[*key]; ok {
+				LoadStruct(ps, dst)
+				return nil
+			}
+		}
+	} else {
+		// キャッシュのエラーは警告ログを出すだけにする
+		logger.Warn(
+			fmt.Sprintf(LogFormat, "GetEntity cache.GetEntities error: %v"),
+		)
+	}
+	// キャッシュから取得出来なければ Datastore から取得
+	err = client.Get(ctx, key, dst)
 	if IsProblem(err) {
 		return err
 	}
-	var merr datastore.MultiError
-	if errors.As(err, &merr) {
-		return merr[0]
+	if errors.Is(err, datastore.ErrNoSuchEntity) {
+		return err // エンティティなし
+	}
+	// 取得したエンティティをキャッシュ
+	err = cache.SetEntities(ctx, map[datastore.Key][]datastore.Property{
+		*key: EntityToProperties(dst),
+	})
+	if err != nil {
+		// キャッシュのエラーは警告ログを出すだけにする
+		logger.Warn(
+			fmt.Sprintf(LogFormat, "GetEntity cache.SetEntities error: %v"),
+		)
 	}
 	return nil
 }

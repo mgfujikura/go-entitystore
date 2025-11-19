@@ -17,7 +17,7 @@ import (
 const LogFormat = "[entitystore] %s"
 
 // client は Datastore クライアントのインスタンスです。
-var client *datastore.Client
+var client DatastoreClient
 
 // cache は Cachestore のインスタンスです。
 var cache cachestore.Cachestore = cachestore.Nostore{}
@@ -31,7 +31,7 @@ var Now = time.Now
 // Client は現在のdatastoreクライアントを返します。
 //
 //goland:noinspection GoUnusedExportedFunction
-func Client() *datastore.Client {
+func Client() DatastoreClient {
 	return client
 }
 
