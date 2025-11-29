@@ -8,16 +8,22 @@ import (
 	"google.golang.org/api/iterator"
 )
 
-// EntityLister はエンティティのリストの取得を容易にするための構造体です。
-type EntityLister[E Entity] struct {
+// EntityLister はエンティティのリストの取得を容易にするためのインターフェースです。
+type EntityLister[E Entity] interface {
+	WithFilter(f func(*datastore.Key) bool) EntityLister[E]
+	GetList(ctx context.Context, limit int, cur string) ([]E, string, error)
+	GetKeyList(ctx context.Context, limit int, cur string) ([]*datastore.Key, string, error)
+}
+
+type entityLister[E Entity] struct {
 	e E
 	q *datastore.Query
 	f func(*datastore.Key) bool
 }
 
 // NewEntityLister コンストラクタ
-func NewEntityLister[E Entity](q *datastore.Query, e E) *EntityLister[E] {
-	return &EntityLister[E]{
+func NewEntityLister[E Entity](q *datastore.Query, e E) EntityLister[E] {
+	return &entityLister[E]{
 		e: e,
 		q: q,
 	}
@@ -26,7 +32,7 @@ func NewEntityLister[E Entity](q *datastore.Query, e E) *EntityLister[E] {
 // WithFilter はフィルタ関数を設定します。
 // フィルタ関数は各エンティティのキーを受け取り、trueを返した場合にそのエンティティが結果に含まれます。
 // フィルタを追加していない場合は、すべてのエンティティが結果に含まれます。
-func (l *EntityLister[E]) WithFilter(f func(*datastore.Key) bool) *EntityLister[E] {
+func (l *entityLister[E]) WithFilter(f func(*datastore.Key) bool) EntityLister[E] {
 	l.f = f
 	return l
 }
@@ -37,7 +43,7 @@ func (l *EntityLister[E]) WithFilter(f func(*datastore.Key) bool) *EntityLister[
 // 戻り値として、取得したエンティティのスライス、新しいカーソル文字列、エラーを返します。
 // カーソル文字列はリストに続きがある場合に新しい文字列が返され、
 // リストの終わりまで達した際には空文字列が返されます。
-func (l *EntityLister[E]) GetList(ctx context.Context, limit int, cur string) ([]E, string, error) {
+func (l *entityLister[E]) GetList(ctx context.Context, limit int, cur string) ([]E, string, error) {
 	q := l.q.KeysOnly()
 	if cur != "" {
 		cursor, err := datastore.DecodeCursor(cur)
@@ -91,7 +97,7 @@ func (l *EntityLister[E]) GetList(ctx context.Context, limit int, cur string) ([
 
 // GetKeyList はエンティティのキーのリストを取得します。
 // キーのリストを返すこと以外は EntityLister.GetList と同様に動作します。
-func (l *EntityLister[E]) GetKeyList(ctx context.Context, limit int, cur string) ([]*datastore.Key, string, error) {
+func (l *entityLister[E]) GetKeyList(ctx context.Context, limit int, cur string) ([]*datastore.Key, string, error) {
 	q := l.q.KeysOnly()
 	if cur != "" {
 		cursor, err := datastore.DecodeCursor(cur)
