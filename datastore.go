@@ -196,7 +196,7 @@ func DeleteMulti(ctx context.Context, keys []*datastore.Key) error {
 // 特別な処理は行いません。
 //
 //goland:noinspection GoUnusedExportedFunction
-func Run(ctx context.Context, q *datastore.Query) *datastore.Iterator {
+func Run(ctx context.Context, q Query) *datastore.Iterator {
 	return client.Run(ctx, q)
 }
 

@@ -22,11 +22,40 @@ type DatastoreClient interface {
 	WithReadOptions(ro ...datastore.ReadOption) *datastore.Client
 	NewTransaction(ctx context.Context, opts ...datastore.TransactionOption) (t *datastore.Transaction, err error)
 	RunInTransaction(ctx context.Context, f func(tx *datastore.Transaction) error, opts ...datastore.TransactionOption) (cmt *datastore.Commit, err error)
-	Count(ctx context.Context, q *datastore.Query) (n int, err error)
-	GetAll(ctx context.Context, q *datastore.Query, dst interface{}) (keys []*datastore.Key, err error)
-	GetAllWithOptions(ctx context.Context, q *datastore.Query, dst interface{}, opts ...datastore.RunOption) (res datastore.GetAllWithOptionsResult, err error)
-	Run(ctx context.Context, q *datastore.Query) (it *datastore.Iterator)
-	RunWithOptions(ctx context.Context, q *datastore.Query, opts ...datastore.RunOption) (it *datastore.Iterator)
+	Count(ctx context.Context, q Query) (n int, err error)
+	GetAll(ctx context.Context, q Query, dst interface{}) (keys []*datastore.Key, err error)
+	GetAllWithOptions(ctx context.Context, q Query, dst interface{}, opts ...datastore.RunOption) (res datastore.GetAllWithOptionsResult, err error)
+	Run(ctx context.Context, q Query) (it *datastore.Iterator)
+	RunWithOptions(ctx context.Context, q Query, opts ...datastore.RunOption) (it *datastore.Iterator)
 	RunAggregationQuery(ctx context.Context, aq *datastore.AggregationQuery) (ar datastore.AggregationResult, err error)
 	RunAggregationQueryWithOptions(ctx context.Context, aq *datastore.AggregationQuery, opts ...datastore.RunOption) (ar datastore.AggregationWithOptionsResult, err error)
+}
+
+type datastoreClient struct {
+	*datastore.Client
+}
+
+func NewClient(client *datastore.Client) DatastoreClient {
+	return &datastoreClient{client}
+}
+
+//goland:noinspection GoDeprecation
+func (c datastoreClient) Count(ctx context.Context, q Query) (n int, err error) {
+	return c.Client.Count(ctx, q.Q())
+}
+
+func (c datastoreClient) GetAll(ctx context.Context, q Query, dst interface{}) (keys []*datastore.Key, err error) {
+	return c.Client.GetAll(ctx, q.Q(), dst)
+}
+
+func (c datastoreClient) GetAllWithOptions(ctx context.Context, q Query, dst interface{}, opts ...datastore.RunOption) (res datastore.GetAllWithOptionsResult, err error) {
+	return c.Client.GetAllWithOptions(ctx, q.Q(), dst, opts...)
+}
+
+func (c datastoreClient) Run(ctx context.Context, q Query) (it *datastore.Iterator) {
+	return c.Client.Run(ctx, q.Q())
+}
+
+func (c datastoreClient) RunWithOptions(ctx context.Context, q Query, opts ...datastore.RunOption) (it *datastore.Iterator) {
+	return c.Client.RunWithOptions(ctx, q.Q(), opts...)
 }

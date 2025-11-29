@@ -7,7 +7,7 @@ import (
 	"cloud.google.com/go/datastore"
 )
 
-// entitystoreで扱うエンティティ定義の基底インターフェースです。
+// Entity はentitystoreで扱うエンティティ定義の基底インターフェースです。
 type Entity interface {
 	Key() *datastore.Key
 

@@ -105,7 +105,7 @@ func TestDeleteAll(t *testing.T) {
 	err = DeleteAll(ctx, "TestEntity")
 	require.Nil(t, err)
 
-	q := datastore.NewQuery("TestEntity").KeysOnly()
+	q := NewQuery("TestEntity").KeysOnly()
 	keys, err := client.GetAll(ctx, q, nil)
 	require.Nil(t, err)
 	require.Len(t, keys, 0)
@@ -550,7 +550,7 @@ func TestGetEntityAll(t *testing.T) {
 	require.Nil(t, err)
 	require.Len(t, cs.Cache, 1)
 
-	q := datastore.NewQuery("TestEntity").Order("Id")
+	q := NewQuery("TestEntity").Order("Id")
 	var es []*TestEntity
 	err = GetEntityAll(ctx, q, &es)
 	require.Nil(t, err)
@@ -578,7 +578,7 @@ func TestGetEntityFirst(t *testing.T) {
 	err := PutEntityMulti(ctx, []*TestEntity{&stored1, &stored2})
 	require.Nil(t, err)
 
-	q := datastore.NewQuery("TestEntity").Order("-Id")
+	q := NewQuery("TestEntity").Order("-Id")
 	var e TestEntity
 	err = GetEntityFirst(ctx, q, &e)
 	require.Nil(t, err)

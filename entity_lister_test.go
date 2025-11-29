@@ -20,7 +20,7 @@ func TestEntityLister_GetList(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	q := datastore.NewQuery("TestEntity").Order("-Id")
+	q := NewQuery("TestEntity").Order("-Id")
 	lister := NewEntityLister(q, &TestEntity{})
 	es, cur, err := lister.GetList(ctx, 2, "")
 
@@ -48,7 +48,7 @@ func TestEntityLister_WithFilter(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	q := datastore.NewQuery("TestEntity").Order("-Id")
+	q := NewQuery("TestEntity").Order("-Id")
 	lister := NewEntityLister(q, &TestEntity{}).WithFilter(func(key *datastore.Key) bool {
 		return key.Name != "3"
 	})
@@ -72,7 +72,7 @@ func TestEntityLister_GetKeyList(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	q := datastore.NewQuery("TestEntity").Order("-Id")
+	q := NewQuery("TestEntity").Order("-Id")
 	lister := NewEntityLister(q, &TestEntity{}).WithFilter(func(key *datastore.Key) bool {
 		return key.Name != "3"
 	})

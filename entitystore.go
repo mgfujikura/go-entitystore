@@ -94,14 +94,18 @@ func IsProblem(err error) bool {
 // Cachestore が nil の場合はキャッシュを使用しません。
 // Logger が nil の場合はデフォルトの slog.Logger が使用されます。
 func Initialize(ctx context.Context, projectId string, conf Config) {
-	var err error
 	if conf.DatabaseId == "" {
-		client, err = datastore.NewClient(ctx, projectId, conf.Options...)
+		cl, err := datastore.NewClient(ctx, projectId, conf.Options...)
+		if err != nil {
+			panic(err)
+		}
+		client = NewClient(cl)
 	} else {
-		client, err = datastore.NewClientWithDatabase(ctx, projectId, conf.DatabaseId, conf.Options...)
-	}
-	if err != nil {
-		panic(err)
+		cl, err := datastore.NewClientWithDatabase(ctx, projectId, conf.DatabaseId, conf.Options...)
+		if err != nil {
+			panic(err)
+		}
+		client = NewClient(cl)
 	}
 
 	if conf.Cachestore == nil {
@@ -119,7 +123,7 @@ func Initialize(ctx context.Context, projectId string, conf Config) {
 // DeleteAll は指定された Kind のすべてのエンティティを削除します。
 func DeleteAll(ctx context.Context, kind string) error {
 	// クエリで対象の Kind のすべてのキーを取得
-	query := datastore.NewQuery(kind).KeysOnly()
+	query := NewQuery(kind).KeysOnly()
 	keys, err := client.GetAll(ctx, query, nil)
 	if err != nil {
 		return err
@@ -199,7 +203,7 @@ func DeleteEntityMulti[E Entity](ctx context.Context, es []E) error {
 // キャッシュに存在するエンティティはキャッシュから取得し、存在しないエンティティはDatastoreから取得します。
 // 取得後、Datastoreから取得したエンティティはキャッシュに保存します。
 // クエリやキーはキャッシュしません。毎回Datastoreに問い合わせ、エンティティの取得のみキャッシュを利用します。
-func GetEntityAll[E Entity](ctx context.Context, q *datastore.Query, dst *[]E) error {
+func GetEntityAll[E Entity](ctx context.Context, q Query, dst *[]E) error {
 	keys, err := client.GetAll(ctx, q.KeysOnly(), nil)
 	if err != nil {
 		return err
@@ -219,7 +223,7 @@ func GetEntityAll[E Entity](ctx context.Context, q *datastore.Query, dst *[]E) e
 
 // GetEntityFirst はクエリにマッチする最初のエンティティを取得します。
 // 最初のエンティティのみを取得すること以外は GetEntityAll と同様に動作します。
-func GetEntityFirst[E Entity](ctx context.Context, q *datastore.Query, dst E) error {
+func GetEntityFirst[E Entity](ctx context.Context, q Query, dst E) error {
 	q = q.KeysOnly()
 	it := client.Run(ctx, q.Limit(1))
 	key, err := it.Next(nil)

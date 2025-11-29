@@ -17,12 +17,12 @@ type EntityLister[E Entity] interface {
 
 type entityLister[E Entity] struct {
 	e E
-	q *datastore.Query
+	q Query
 	f func(*datastore.Key) bool
 }
 
 // NewEntityLister コンストラクタ
-func NewEntityLister[E Entity](q *datastore.Query, e E) EntityLister[E] {
+func NewEntityLister[E Entity](q Query, e E) EntityLister[E] {
 	return &entityLister[E]{
 		e: e,
 		q: q,
