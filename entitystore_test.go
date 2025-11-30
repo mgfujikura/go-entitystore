@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/datastore"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/api/option"
 
@@ -585,4 +586,58 @@ func TestGetEntityFirst(t *testing.T) {
 	require.Equal(t, stored2.Value, e.Value)
 
 	require.Len(t, cs.Cache, 1)
+}
+
+func TestRemoveEntityCaches(t *testing.T) {
+	ctx := context.Background()
+	cs := &cachestore.Memorystore{}
+	DefaultTestInitialize(ctx, cs)
+
+	stored1 := TestEntity{
+		Id:    1,
+		Value: "Test Value",
+	}
+	stored2 := TestEntity{
+		Id:    2,
+		Value: "Test Value 2",
+	}
+	err := PutEntityMulti(ctx, []*TestEntity{&stored1, &stored2})
+	require.Nil(t, err)
+	err = GetEntityMulti(ctx, []*TestEntity{&stored1, &stored2})
+	require.Nil(t, err)
+
+	require.Len(t, cs.Cache, 2)
+
+	RemoveEntityCaches(ctx, []*TestEntity{&stored1})
+	require.Len(t, cs.Cache, 1)
+	for k := range cs.Cache {
+		assert.Equal(t, "2", k.Name)
+	}
+}
+
+func TestRemoveCaches(t *testing.T) {
+	ctx := context.Background()
+	cs := &cachestore.Memorystore{}
+	DefaultTestInitialize(ctx, cs)
+
+	stored1 := TestEntity{
+		Id:    1,
+		Value: "Test Value",
+	}
+	stored2 := TestEntity{
+		Id:    2,
+		Value: "Test Value 2",
+	}
+	err := PutEntityMulti(ctx, []*TestEntity{&stored1, &stored2})
+	require.Nil(t, err)
+	err = GetEntityMulti(ctx, []*TestEntity{&stored1, &stored2})
+	require.Nil(t, err)
+
+	require.Len(t, cs.Cache, 2)
+
+	RemoveCaches(ctx, []datastore.Key{*(stored1.Key())})
+	require.Len(t, cs.Cache, 1)
+	for k := range cs.Cache {
+		assert.Equal(t, "2", k.Name)
+	}
 }

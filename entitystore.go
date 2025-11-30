@@ -279,3 +279,16 @@ func entityConstructor[E Entity](e E) func() E {
 		return v.Interface().(E)
 	}
 }
+
+func RemoveEntityCaches[E Entity](ctx context.Context, es []E) {
+	RemoveCaches(ctx, lo.Map(es, func(e E, _ int) datastore.Key {
+		return *e.Key()
+	}))
+}
+
+func RemoveCaches(ctx context.Context, keys []datastore.Key) {
+	err := cache.DeleteEntities(ctx, keys)
+	if err != nil {
+		logger.Warn("failed to remove cache", slog.String("error", err.Error()))
+	}
+}
