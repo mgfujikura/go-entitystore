@@ -87,6 +87,30 @@ func IsProblem(err error) bool {
 	}
 }
 
+// PickUp はエンティティのスライスとエラーを受け取り、ErrNoSuchEntity でないエラーが含まれている場合はパニックを起こし、
+// ErrNoSuchEntity のエラーが含まれている場合は対応するエンティティをスキップして返します。
+// GetMulti の結果から取得したエンティティのみを取り出したい場合に使用します。
+func PickUp[E any](ent []E, err error) []E {
+	var merr datastore.MultiError
+	if errors.As(err, &merr) {
+		var ret []E
+		for i, e := range merr {
+			if IsProblem(e) {
+				panic(e)
+			}
+			if errors.Is(e, datastore.ErrNoSuchEntity) {
+				continue
+			}
+			ret = append(ret, ent[i])
+		}
+		return ret
+	}
+	if IsProblem(err) {
+		panic(err)
+	}
+	return ent
+}
+
 // Initialize は entitystore を初期化します。
 // projectId は GCP のプロジェクト ID を指定します。
 // conf にはオプションを指定します。

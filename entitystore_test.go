@@ -641,3 +641,25 @@ func TestRemoveCaches(t *testing.T) {
 		assert.Equal(t, "2", k.Name)
 	}
 }
+
+func TestPickUp(t *testing.T) {
+	ctx := context.Background()
+	cs := &cachestore.Memorystore{}
+	DefaultTestInitialize(ctx, cs)
+
+	stored1 := TestEntity{
+		Id:    1,
+		Value: "Test Value",
+	}
+	stored2 := TestEntity{
+		Id: 2,
+	}
+	err := PutEntityMulti(ctx, []*TestEntity{&stored1})
+	require.Nil(t, err)
+	gets := []*TestEntity{&stored1, &stored2}
+	err = GetEntityMulti(ctx, gets)
+	require.Error(t, err)
+	pickup := PickUp(gets, err)
+	require.Len(t, pickup, 1)
+	require.Equal(t, stored1.Value, pickup[0].Value)
+}
