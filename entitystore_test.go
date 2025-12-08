@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -662,4 +663,79 @@ func TestPickUp(t *testing.T) {
 	pickup := PickUp(gets, err)
 	require.Len(t, pickup, 1)
 	require.Equal(t, stored1.Value, pickup[0].Value)
+}
+
+func TestGetKeyAll(t *testing.T) {
+	ctx := context.Background()
+	cs := &cachestore.Memorystore{}
+	DefaultTestInitialize(ctx, cs)
+
+	stored1 := TestEntity{
+		Id:    1,
+		Value: "Test Value",
+	}
+	stored2 := TestEntity{
+		Id:    2,
+		Value: "Test Value 2",
+	}
+
+	err := PutEntityMulti(ctx, []*TestEntity{&stored1, &stored2})
+	require.Nil(t, err)
+
+	q := NewQuery("TestEntity").Order("Id")
+	keys, err := GetKeyAll(ctx, q)
+	require.Nil(t, err)
+	require.Len(t, keys, 2)
+	require.Equal(t, "TestEntity", keys[0].Kind)
+	require.Equal(t, strconv.Itoa(stored1.Id), keys[0].Name)
+	require.Equal(t, "TestEntity", keys[1].Kind)
+	require.Equal(t, strconv.Itoa(stored2.Id), keys[1].Name)
+}
+
+func TestGetKeyFirst(t *testing.T) {
+	ctx := context.Background()
+	cs := &cachestore.Memorystore{}
+	DefaultTestInitialize(ctx, cs)
+
+	stored1 := TestEntity{
+		Id:    1,
+		Value: "Test Value",
+	}
+	stored2 := TestEntity{
+		Id:    2,
+		Value: "Test Value 2",
+	}
+
+	err := PutEntityMulti(ctx, []*TestEntity{&stored1, &stored2})
+	require.Nil(t, err)
+
+	q := NewQuery("TestEntity").Order("-Id")
+	key, err := GetKeyFirst(ctx, q)
+	require.Nil(t, err)
+	require.NotNil(t, key)
+	require.Equal(t, "TestEntity", key.Kind)
+	require.Equal(t, strconv.Itoa(stored2.Id), key.Name)
+}
+
+func TestGetKeyFirst_存在しない場合(t *testing.T) {
+	ctx := context.Background()
+	cs := &cachestore.Memorystore{}
+	DefaultTestInitialize(ctx, cs)
+
+	stored1 := TestEntity{
+		Id:    1,
+		Value: "Test Value",
+	}
+	stored2 := TestEntity{
+		Id:    2,
+		Value: "Test Value 2",
+	}
+
+	err := PutEntityMulti(ctx, []*TestEntity{&stored1, &stored2})
+	require.Nil(t, err)
+
+	q := NewQuery("TestEntity").FilterField("Id", "=", 3)
+	key, err := GetKeyFirst(ctx, q)
+	require.Equal(t, datastore.ErrNoSuchEntity, err)
+	require.Nil(t, key)
 }

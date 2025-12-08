@@ -257,6 +257,23 @@ func GetEntityFirst[E Entity](ctx context.Context, q Query, dst E) error {
 	return Get(ctx, key, dst)
 }
 
+// GetKeyAll はクエリにマッチするすべてのキーを取得します。
+func GetKeyAll(ctx context.Context, q Query) ([]*datastore.Key, error) {
+	return client.GetAll(ctx, q.KeysOnly(), nil)
+}
+
+// GetKeyFirst はクエリにマッチする最初のキーを取得します。マッチするキーがない場合は datastore.ErrNoSuchEntity を返します。
+func GetKeyFirst(ctx context.Context, q Query) (*datastore.Key, error) {
+	keys, err := client.GetAll(ctx, q.KeysOnly().Limit(1), nil)
+	if err != nil {
+		return nil, err
+	}
+	if len(keys) == 0 {
+		return nil, datastore.ErrNoSuchEntity
+	}
+	return keys[0], nil
+}
+
 // DeleteCacheByEntities はキャッシュからエンティティを削除します。
 // 通常キャッシュは PutEntity や DeleteEntity 時に自動的に削除されますが、
 // それ以外のタイミングでキャッシュを削除したい場合に使用します。
