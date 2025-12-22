@@ -9,7 +9,7 @@ import (
 	"fmt"
 
 	"cloud.google.com/go/datastore"
-	"google.golang.org/appengine/memcache"
+	"google.golang.org/appengine/v2/memcache"
 
 	"go.fujikura.biz/entitystore/cachestore"
 )
