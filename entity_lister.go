@@ -32,6 +32,7 @@ func NewEntityLister[E Entity](q Query, e E) EntityLister[E] {
 // WithFilter はフィルタ関数を設定します。
 // フィルタ関数は各エンティティのキーを受け取り、trueを返した場合にそのエンティティが結果に含まれます。
 // フィルタを追加していない場合は、すべてのエンティティが結果に含まれます。
+// これはdatstoreのクエリで表現できないような特殊なフィルタを適用するために使います。
 func (l *entityLister[E]) WithFilter(f func(*datastore.Key) bool) EntityLister[E] {
 	l.f = f
 	return l
