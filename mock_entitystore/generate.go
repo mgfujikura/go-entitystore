@@ -5,3 +5,4 @@ package mock_entitystore
 //go:generate mockgen -source=../entity_lister.go -destination=mock_entity_lister.go
 //go:generate mockgen -source=../query.go -destination=mock_query.go
 //go:generate mockgen -source=../mutation.go -destination=mock_mutation.go
+//go:generate mockgen -source=../transaction.go -destination=mock_transaction.go

@@ -9,7 +9,7 @@ Cloud Datastore 操作用パッケージです。
 - `Entity` / `EntityBase` … `UpdatedAt`・`SchemaVersion` 付きのエンティティ契約
 - CRUD … `GetEntity` / `PutEntity` / `DeleteEntity` および Multi 版
 - キャッシュ … `cachestore.Cachestore`（未設定時は無効）。Put / Delete / Mutate 後に無効化
-- トランザクション … `RunInTransaction` + `*Transaction`（Entity API・コミット後のキャッシュ無効化）
+- トランザクション … `RunInTransaction` + `Transaction`（Entity API・コミット後のキャッシュ無効化）
 - Mutation … `MutateEntity`（Insert / Update / Upsert / Delete、`PrePutAction` あり）
 - クエリ補助 … `EntityLister`（カーソルページング）、`GetEntityAll`（`MultiOpLimit` 件ずつ取得）
 - 集計 … `Count` / `Avg` / `IntSum` / `Float64Sum` / `NewAggregation`
@@ -96,7 +96,7 @@ err = entitystore.DeleteEntity(ctx, &user)
 ### トランザクション
 
 ```go
-_, err := entitystore.RunInTransaction(ctx, func(tx *entitystore.Transaction) error {
+_, err := entitystore.RunInTransaction(ctx, func(tx entitystore.Transaction) error {
     var user User
     if err := entitystore.GetEntityTx(tx, &user); err != nil {
         return err

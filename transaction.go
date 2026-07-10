@@ -7,21 +7,36 @@ import (
 	"github.com/samber/lo"
 )
 
-// Transaction は Datastore トランザクションを Entity / キャッシュ連携付きで扱うラッパーです。
+// Transaction は Datastore トランザクションを Entity / キャッシュ連携付きで扱うインターフェースです。
 // トランザクション内の読み取りはキャッシュを使わず、書き込み・削除のキャッシュ無効化はコミット成功後に行います。
-type Transaction struct {
-	tx           *datastore.Transaction
-	keys         []datastore.Key
-	pendingKeys  []*datastore.PendingKey
+type Transaction interface {
+	Raw() *datastore.Transaction
+	Query(kind string) Query
+	Get(key *datastore.Key, dst any) error
+	GetMulti(keys []*datastore.Key, dst any) error
+	Put(key *datastore.Key, src any) error
+	PutMulti(keys []*datastore.Key, src any) error
+	Delete(key *datastore.Key) error
+	DeleteMulti(keys []*datastore.Key) error
+	Mutate(muts ...*datastore.Mutation) ([]*datastore.PendingKey, error)
+	// TrackKey はコミット後のキャッシュ無効化対象としてキーを登録します。
+	// Mutate で完成済みキーを扱う場合など、Put / Delete 以外で変更したキーに使います。
+	TrackKey(key *datastore.Key)
+}
+
+type transaction struct {
+	tx          *datastore.Transaction
+	keys        []datastore.Key
+	pendingKeys []*datastore.PendingKey
 }
 
 // RunInTransaction はトランザクションを実行します。
 // f が成功してコミットされたあと、トランザクション内で変更したキーのキャッシュを無効化します。
 // キャッシュ無効化に失敗した場合は ErrCacheInvalidate でラップしたエラーを返します（コミット自体は成功しています）。
-func RunInTransaction(ctx context.Context, f func(tx *Transaction) error, opts ...datastore.TransactionOption) (*datastore.Commit, error) {
-	var tx *Transaction
+func RunInTransaction(ctx context.Context, f func(tx Transaction) error, opts ...datastore.TransactionOption) (*datastore.Commit, error) {
+	var tx *transaction
 	cmt, err := client.RunInTransaction(ctx, func(dtx *datastore.Transaction) error {
-		tx = &Transaction{tx: dtx}
+		tx = &transaction{tx: dtx}
 		return f(tx)
 	}, opts...)
 	if err != nil {
@@ -34,28 +49,28 @@ func RunInTransaction(ctx context.Context, f func(tx *Transaction) error, opts .
 }
 
 // Raw は内部の *datastore.Transaction を返します。
-func (t *Transaction) Raw() *datastore.Transaction {
+func (t *transaction) Raw() *datastore.Transaction {
 	return t.tx
 }
 
 // Query はトランザクションに紐づく Query を返します。
-func (t *Transaction) Query(kind string) Query {
+func (t *transaction) Query(kind string) Query {
 	return NewQuery(kind).Transaction(t.tx)
 }
 
 // Get はトランザクション内でエンティティを取得します。キャッシュは使用しません。
-func (t *Transaction) Get(key *datastore.Key, dst any) error {
+func (t *transaction) Get(key *datastore.Key, dst any) error {
 	return t.tx.Get(key, dst)
 }
 
 // GetMulti はトランザクション内で複数のエンティティを取得します。キャッシュは使用しません。
-func (t *Transaction) GetMulti(keys []*datastore.Key, dst any) error {
+func (t *transaction) GetMulti(keys []*datastore.Key, dst any) error {
 	return t.tx.GetMulti(keys, dst)
 }
 
 // Put はトランザクション内でエンティティを保存します。
 // キャッシュの無効化はコミット成功後に行われます。
-func (t *Transaction) Put(key *datastore.Key, src any) error {
+func (t *transaction) Put(key *datastore.Key, src any) error {
 	pk, err := t.tx.Put(key, src)
 	if err != nil {
 		return err
@@ -66,7 +81,7 @@ func (t *Transaction) Put(key *datastore.Key, src any) error {
 
 // PutMulti はトランザクション内で複数のエンティティを保存します。
 // キャッシュの無効化はコミット成功後に行われます。
-func (t *Transaction) PutMulti(keys []*datastore.Key, src any) error {
+func (t *transaction) PutMulti(keys []*datastore.Key, src any) error {
 	pks, err := t.tx.PutMulti(keys, src)
 	if err != nil {
 		return err
@@ -79,30 +94,30 @@ func (t *Transaction) PutMulti(keys []*datastore.Key, src any) error {
 
 // Delete はトランザクション内でエンティティを削除します。
 // キャッシュの無効化はコミット成功後に行われます。
-func (t *Transaction) Delete(key *datastore.Key) error {
+func (t *transaction) Delete(key *datastore.Key) error {
 	if err := t.tx.Delete(key); err != nil {
 		return err
 	}
-	t.trackKey(key)
+	t.TrackKey(key)
 	return nil
 }
 
 // DeleteMulti はトランザクション内で複数のエンティティを削除します。
 // キャッシュの無効化はコミット成功後に行われます。
-func (t *Transaction) DeleteMulti(keys []*datastore.Key) error {
+func (t *transaction) DeleteMulti(keys []*datastore.Key) error {
 	if err := t.tx.DeleteMulti(keys); err != nil {
 		return err
 	}
 	for _, key := range keys {
-		t.trackKey(key)
+		t.TrackKey(key)
 	}
 	return nil
 }
 
 // Mutate はトランザクション内で Mutation を適用します。
 // 返された PendingKey のうち incomplete なキー由来のものはコミット後のキャッシュ無効化に使われます。
-// 完成済みキーのキャッシュ無効化は呼び出し側で track するか、MutateEntityTx を使ってください。
-func (t *Transaction) Mutate(muts ...*datastore.Mutation) ([]*datastore.PendingKey, error) {
+// 完成済みキーのキャッシュ無効化は呼び出し側で TrackKey するか、MutateEntityTx を使ってください。
+func (t *transaction) Mutate(muts ...*datastore.Mutation) ([]*datastore.PendingKey, error) {
 	pks, err := t.tx.Mutate(muts...)
 	if err != nil {
 		return nil, err
@@ -115,13 +130,13 @@ func (t *Transaction) Mutate(muts ...*datastore.Mutation) ([]*datastore.PendingK
 	return pks, nil
 }
 
-// GetEntity はトランザクション内で単一のエンティティを取得します。キャッシュは使用しません。
-func GetEntityTx[E Entity](tx *Transaction, e E) error {
+// GetEntityTx はトランザクション内で単一のエンティティを取得します。キャッシュは使用しません。
+func GetEntityTx[E Entity](tx Transaction, e E) error {
 	return tx.Get(e.Key(), e)
 }
 
 // GetEntityMultiTx はトランザクション内で複数のエンティティを取得します。キャッシュは使用しません。
-func GetEntityMultiTx[E Entity](tx *Transaction, es []E) error {
+func GetEntityMultiTx[E Entity](tx Transaction, es []E) error {
 	keys := lo.Map(es, func(e E, _ int) *datastore.Key {
 		return e.Key()
 	})
@@ -130,7 +145,7 @@ func GetEntityMultiTx[E Entity](tx *Transaction, es []E) error {
 
 // PutEntityTx はトランザクション内で単一のエンティティを保存します。
 // PrePutAction を実行し、キャッシュの無効化はコミット成功後に行われます。
-func PutEntityTx[E Entity](ctx context.Context, tx *Transaction, e E) error {
+func PutEntityTx[E Entity](ctx context.Context, tx Transaction, e E) error {
 	if err := e.PrePutAction(ctx); err != nil {
 		return err
 	}
@@ -139,7 +154,7 @@ func PutEntityTx[E Entity](ctx context.Context, tx *Transaction, e E) error {
 
 // PutEntityMultiTx はトランザクション内で複数のエンティティを保存します。
 // PrePutAction を実行し、キャッシュの無効化はコミット成功後に行われます。
-func PutEntityMultiTx[E Entity](ctx context.Context, tx *Transaction, es []E) error {
+func PutEntityMultiTx[E Entity](ctx context.Context, tx Transaction, es []E) error {
 	keys := make([]*datastore.Key, 0, len(es))
 	for _, e := range es {
 		if err := e.PrePutAction(ctx); err != nil {
@@ -152,13 +167,13 @@ func PutEntityMultiTx[E Entity](ctx context.Context, tx *Transaction, es []E) er
 
 // DeleteEntityTx はトランザクション内で単一のエンティティを削除します。
 // キャッシュの無効化はコミット成功後に行われます。
-func DeleteEntityTx[E Entity](tx *Transaction, e E) error {
+func DeleteEntityTx[E Entity](tx Transaction, e E) error {
 	return tx.Delete(e.Key())
 }
 
 // DeleteEntityMultiTx はトランザクション内で複数のエンティティを削除します。
 // キャッシュの無効化はコミット成功後に行われます。
-func DeleteEntityMultiTx[E Entity](tx *Transaction, es []E) error {
+func DeleteEntityMultiTx[E Entity](tx Transaction, es []E) error {
 	return tx.DeleteMulti(lo.Map(es, func(e E, _ int) *datastore.Key {
 		return e.Key()
 	}))
@@ -167,7 +182,7 @@ func DeleteEntityMultiTx[E Entity](tx *Transaction, es []E) error {
 // MutateEntityTx はトランザクション内で複数のエンティティに対して変更を適用します。
 // Insert / Update / Upsert の場合は PrePutAction を実行します。
 // キャッシュの無効化はコミット成功後に行われます。
-func MutateEntityTx(ctx context.Context, tx *Transaction, muts ...*Mutation) error {
+func MutateEntityTx(ctx context.Context, tx Transaction, muts ...*Mutation) error {
 	for _, m := range muts {
 		switch m.Type {
 		case MutationTypeInsert, MutationTypeUpdate, MutationTypeUpsert:
@@ -194,27 +209,27 @@ func MutateEntityTx(ctx context.Context, tx *Transaction, muts ...*Mutation) err
 		return err
 	}
 	for _, m := range muts {
-		tx.trackKey(m.Key)
+		tx.TrackKey(m.Key)
 	}
 	return nil
 }
 
-func (t *Transaction) trackPut(key *datastore.Key, pk *datastore.PendingKey) {
+func (t *transaction) trackPut(key *datastore.Key, pk *datastore.PendingKey) {
 	if key.Incomplete() {
 		t.pendingKeys = append(t.pendingKeys, pk)
 		return
 	}
-	t.trackKey(key)
+	t.TrackKey(key)
 }
 
-func (t *Transaction) trackKey(key *datastore.Key) {
+func (t *transaction) TrackKey(key *datastore.Key) {
 	if key == nil || key.Incomplete() {
 		return
 	}
 	t.keys = append(t.keys, *key)
 }
 
-func (t *Transaction) invalidateCache(ctx context.Context, cmt *datastore.Commit) error {
+func (t *transaction) invalidateCache(ctx context.Context, cmt *datastore.Commit) error {
 	keys := t.keys
 	if cmt != nil {
 		for _, pk := range t.pendingKeys {

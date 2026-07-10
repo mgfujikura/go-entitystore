@@ -36,8 +36,8 @@ func TestTransaction_invalidateCache(t *testing.T) {
 	cache = cs
 	logger = slog.Default()
 
-	tx := &Transaction{}
-	tx.trackKey(&key)
+	tx := &transaction{}
+	tx.TrackKey(&key)
 	require.NoError(t, tx.invalidateCache(ctx, nil))
 	require.Len(t, cs.Cache, 0)
 }
@@ -57,9 +57,9 @@ func TestTransaction_invalidateCache_dedupesKeys(t *testing.T) {
 	cache = cs
 	logger = slog.Default()
 
-	tx := &Transaction{}
-	tx.trackKey(&key)
-	tx.trackKey(&key)
+	tx := &transaction{}
+	tx.TrackKey(&key)
+	tx.TrackKey(&key)
 	require.NoError(t, tx.invalidateCache(ctx, nil))
 	require.Len(t, cs.Cache, 0)
 }
@@ -74,15 +74,15 @@ func TestTransaction_invalidateCache_wrapsError(t *testing.T) {
 	logger = slog.Default()
 
 	key := *datastore.NameKey("TestEntity", "1", nil)
-	tx := &Transaction{}
-	tx.trackKey(&key)
+	tx := &transaction{}
+	tx.TrackKey(&key)
 	err := tx.invalidateCache(ctx, nil)
 	require.ErrorIs(t, err, ErrCacheInvalidate)
 }
 
 func TestTransaction_trackPut_completeKey(t *testing.T) {
 	key := datastore.NameKey("TestEntity", "1", nil)
-	tx := &Transaction{}
+	tx := &transaction{}
 	tx.trackPut(key, nil)
 	require.Len(t, tx.keys, 1)
 	require.Equal(t, *key, tx.keys[0])
@@ -91,7 +91,7 @@ func TestTransaction_trackPut_completeKey(t *testing.T) {
 
 func TestTransaction_trackPut_incompleteKey(t *testing.T) {
 	key := datastore.IncompleteKey("TestEntity", nil)
-	tx := &Transaction{}
+	tx := &transaction{}
 	tx.trackPut(key, nil)
 	require.Empty(t, tx.keys)
 	require.Len(t, tx.pendingKeys, 1)
@@ -112,7 +112,7 @@ func TestRunInTransaction_GetEntityTx_ignoresCache(t *testing.T) {
 		*stored.Key(): ps,
 	}))
 
-	_, err = RunInTransaction(ctx, func(tx *Transaction) error {
+	_, err = RunInTransaction(ctx, func(tx Transaction) error {
 		e := TestEntity{Id: 1}
 		if err := GetEntityTx(tx, &e); err != nil {
 			return err
@@ -142,7 +142,7 @@ func TestRunInTransaction_PutEntityTx_commitsAndInvalidatesCache(t *testing.T) {
 	}))
 	require.Len(t, cs.Cache, 1)
 
-	_, err = RunInTransaction(ctx, func(tx *Transaction) error {
+	_, err = RunInTransaction(ctx, func(tx Transaction) error {
 		e := TestEntity{Id: 1, Value: "new"}
 		return PutEntityTx(ctx, tx, &e)
 	})
@@ -170,7 +170,7 @@ func TestRunInTransaction_rollback_doesNotCommitOrInvalidateCache(t *testing.T) 
 	}))
 	require.Len(t, cs.Cache, 1)
 
-	_, err = RunInTransaction(ctx, func(tx *Transaction) error {
+	_, err = RunInTransaction(ctx, func(tx Transaction) error {
 		e := TestEntity{Id: 1, Value: "should-not-commit"}
 		if err := PutEntityTx(ctx, tx, &e); err != nil {
 			return err
@@ -198,7 +198,7 @@ func TestRunInTransaction_DeleteEntityTx(t *testing.T) {
 		*stored.Key(): ps,
 	}))
 
-	_, err = RunInTransaction(ctx, func(tx *Transaction) error {
+	_, err = RunInTransaction(ctx, func(tx Transaction) error {
 		return DeleteEntityTx(tx, &TestEntity{Id: 1})
 	})
 	require.NoError(t, err)
@@ -219,7 +219,7 @@ func TestRunInTransaction_PutEntityMultiTx_and_GetEntityMultiTx(t *testing.T) {
 		{Id: 2, Value: "b"},
 	}))
 
-	_, err := RunInTransaction(ctx, func(tx *Transaction) error {
+	_, err := RunInTransaction(ctx, func(tx Transaction) error {
 		es := []*TestEntity{{Id: 1}, {Id: 2}}
 		if err := GetEntityMultiTx(tx, es); err != nil {
 			return err
@@ -248,7 +248,7 @@ func TestRunInTransaction_DeleteEntityMultiTx(t *testing.T) {
 		{Id: 2, Value: "b"},
 	}))
 
-	_, err := RunInTransaction(ctx, func(tx *Transaction) error {
+	_, err := RunInTransaction(ctx, func(tx Transaction) error {
 		return DeleteEntityMultiTx(tx, []*TestEntity{{Id: 1}, {Id: 2}})
 	})
 	require.NoError(t, err)
@@ -281,7 +281,7 @@ func TestRunInTransaction_MutateEntityTx(t *testing.T) {
 	}))
 	require.Len(t, cs.Cache, 2)
 
-	_, err = RunInTransaction(ctx, func(tx *Transaction) error {
+	_, err = RunInTransaction(ctx, func(tx Transaction) error {
 		return MutateEntityTx(ctx, tx,
 			NewUpdate(&TestEntity{Id: 1, Value: "updated"}),
 			NewDelete(&TestEntity{Id: 2}),
