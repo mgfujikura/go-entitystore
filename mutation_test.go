@@ -14,7 +14,7 @@ import (
 func TestMutateEntity(t *testing.T) {
 	ctx := context.Background()
 	cs := &cachestore.Memorystore{}
-	DefaultTestInitialize(ctx, cs)
+	DefaultTestInitialize(t, ctx, cs)
 
 	stored1 := TestEntity{
 		Id:    1,

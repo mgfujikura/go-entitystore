@@ -8,6 +8,9 @@ import (
 // EntityBase は Entity インターフェースの基本実装を提供する構造体です。
 // Key() メソッド以外の Entity インターフェースのメソッドを実装しており、
 // 埋め込みによって利用できます。
+//
+// SchemaVersion はマイグレーション用の枠のみを提供します。
+// 実体の移行処理はアプリケーション側で SchemaVersion と CurrentSchemaVersion を比較して行ってください。
 type EntityBase struct {
 	UpdatedAtColumn     time.Time `datastore:"UpdatedAt"`
 	SchemaVersionColumn int       `datastore:"SchemaVersion"`

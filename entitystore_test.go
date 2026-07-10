@@ -18,6 +18,7 @@ import (
 )
 
 func TestInitialize_デフォルトデータベース(t *testing.T) {
+	requireIntegration(t)
 	ctx := context.Background()
 	Initialize(ctx, "entitystore-test-project", Config{
 		Options: []option.ClientOption{
@@ -39,6 +40,7 @@ func TestInitialize_デフォルトデータベース(t *testing.T) {
 }
 
 func TestInitialize_データベース指定(t *testing.T) {
+	requireIntegration(t)
 	ctx := context.Background()
 	Initialize(ctx, "entitystore-test-project", Config{
 		DatabaseId: "test-database",
@@ -57,6 +59,7 @@ func TestInitialize_データベース指定(t *testing.T) {
 }
 
 func TestInitialize_キャッシュストア指定(t *testing.T) {
+	requireIntegration(t)
 	ctx := context.Background()
 	Initialize(ctx, "entitystore-test-project", Config{
 		Options: []option.ClientOption{
@@ -70,6 +73,7 @@ func TestInitialize_キャッシュストア指定(t *testing.T) {
 }
 
 func TestInitialize_ロガー指定(t *testing.T) {
+	requireIntegration(t)
 	ctx := context.Background()
 	testLogger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	Initialize(ctx, "entitystore-test-project", Config{
@@ -83,6 +87,7 @@ func TestInitialize_ロガー指定(t *testing.T) {
 }
 
 func TestDeleteAll(t *testing.T) {
+	requireIntegration(t)
 	ctx := context.Background()
 	Initialize(ctx, "entitystore-test-project", Config{
 		Options: []option.ClientOption{
@@ -116,7 +121,7 @@ func TestDeleteAll(t *testing.T) {
 func TestGetEntity_datastoreから取得(t *testing.T) {
 	ctx := context.Background()
 	cs := &cachestore.Memorystore{}
-	DefaultTestInitialize(ctx, cs)
+	DefaultTestInitialize(t, ctx, cs)
 
 	stored := TestEntity{
 		Id:    1,
@@ -138,7 +143,7 @@ func TestGetEntity_datastoreから取得(t *testing.T) {
 func TestGetEntity_キャッシュから取得(t *testing.T) {
 	ctx := context.Background()
 	cs := &cachestore.Memorystore{}
-	DefaultTestInitialize(ctx, cs)
+	DefaultTestInitialize(t, ctx, cs)
 
 	stored := TestEntity{
 		Id:    1,
@@ -161,7 +166,7 @@ func TestGetEntity_キャッシュから取得(t *testing.T) {
 
 func TestGetEntity_存在しない(t *testing.T) {
 	ctx := context.Background()
-	DefaultTestInitialize(ctx, nil)
+	DefaultTestInitialize(t, ctx, nil)
 
 	e := TestEntity{
 		Id: 999,
@@ -173,7 +178,7 @@ func TestGetEntity_存在しない(t *testing.T) {
 func TestGetEntityMulti_datastoreから取得(t *testing.T) {
 	ctx := context.Background()
 	cs := &cachestore.Memorystore{}
-	DefaultTestInitialize(ctx, cs)
+	DefaultTestInitialize(t, ctx, cs)
 	require.Len(t, cs.Cache, 0)
 
 	stored1 := TestEntity{
@@ -209,7 +214,7 @@ func TestGetEntityMulti_datastoreから取得(t *testing.T) {
 func TestGetEntityMulti_cacheから取得(t *testing.T) {
 	ctx := context.Background()
 	cs := &cachestore.Memorystore{}
-	DefaultTestInitialize(ctx, cs)
+	DefaultTestInitialize(t, ctx, cs)
 
 	stored1 := TestEntity{
 		Id:    1,
@@ -247,7 +252,7 @@ func TestGetEntityMulti_cacheから取得(t *testing.T) {
 func TestGetEntityMulti_datastoreとcacheから取得(t *testing.T) {
 	ctx := context.Background()
 	cs := &cachestore.Memorystore{}
-	DefaultTestInitialize(ctx, cs)
+	DefaultTestInitialize(t, ctx, cs)
 
 	stored1 := TestEntity{
 		Id:    1,
@@ -285,7 +290,7 @@ func TestGetEntityMulti_datastoreとcacheから取得(t *testing.T) {
 func TestGetEntityMulti_datastoreとcacheから取得し取得出来なかったものもある(t *testing.T) {
 	ctx := context.Background()
 	cs := &cachestore.Memorystore{}
-	DefaultTestInitialize(ctx, cs)
+	DefaultTestInitialize(t, ctx, cs)
 
 	stored1 := TestEntity{
 		Id:    1,
@@ -334,7 +339,7 @@ func TestGetEntityMulti_datastoreとcacheから取得し取得出来なかった
 func TestPutEntity(t *testing.T) {
 	ctx := context.Background()
 	cs := &cachestore.Memorystore{}
-	DefaultTestInitialize(ctx, cs)
+	DefaultTestInitialize(t, ctx, cs)
 	Now = func() (now time.Time) {
 		return time.Date(2001, 1, 1, 0, 0, 0, 0, time.UTC)
 	}
@@ -381,7 +386,7 @@ func TestPutEntity(t *testing.T) {
 func TestPutEntityMulti(t *testing.T) {
 	ctx := context.Background()
 	cs := &cachestore.Memorystore{}
-	DefaultTestInitialize(ctx, cs)
+	DefaultTestInitialize(t, ctx, cs)
 	Now = func() (now time.Time) {
 		return time.Date(2001, 1, 1, 0, 0, 0, 0, time.UTC)
 	}
@@ -441,7 +446,7 @@ func TestPutEntityMulti(t *testing.T) {
 func TestDeleteEntity(t *testing.T) {
 	ctx := context.Background()
 	cs := &cachestore.Memorystore{}
-	DefaultTestInitialize(ctx, cs)
+	DefaultTestInitialize(t, ctx, cs)
 
 	stored1 := TestEntity{
 		Id:    1,
@@ -481,7 +486,7 @@ func TestDeleteEntity(t *testing.T) {
 func TestDeleteEntityMulti(t *testing.T) {
 	ctx := context.Background()
 	cs := &cachestore.Memorystore{}
-	DefaultTestInitialize(ctx, cs)
+	DefaultTestInitialize(t, ctx, cs)
 
 	stored1 := TestEntity{
 		Id:    1,
@@ -530,7 +535,7 @@ func TestDeleteEntityMulti(t *testing.T) {
 func TestGetEntityAll(t *testing.T) {
 	ctx := context.Background()
 	cs := &cachestore.Memorystore{}
-	DefaultTestInitialize(ctx, cs)
+	DefaultTestInitialize(t, ctx, cs)
 
 	stored1 := TestEntity{
 		Id:    1,
@@ -566,7 +571,7 @@ func TestGetEntityAll(t *testing.T) {
 func TestGetEntityFirst(t *testing.T) {
 	ctx := context.Background()
 	cs := &cachestore.Memorystore{}
-	DefaultTestInitialize(ctx, cs)
+	DefaultTestInitialize(t, ctx, cs)
 
 	stored1 := TestEntity{
 		Id:    1,
@@ -592,7 +597,7 @@ func TestGetEntityFirst(t *testing.T) {
 func TestRemoveEntityCaches(t *testing.T) {
 	ctx := context.Background()
 	cs := &cachestore.Memorystore{}
-	DefaultTestInitialize(ctx, cs)
+	DefaultTestInitialize(t, ctx, cs)
 
 	stored1 := TestEntity{
 		Id:    1,
@@ -619,7 +624,7 @@ func TestRemoveEntityCaches(t *testing.T) {
 func TestRemoveCaches(t *testing.T) {
 	ctx := context.Background()
 	cs := &cachestore.Memorystore{}
-	DefaultTestInitialize(ctx, cs)
+	DefaultTestInitialize(t, ctx, cs)
 
 	stored1 := TestEntity{
 		Id:    1,
@@ -646,7 +651,7 @@ func TestRemoveCaches(t *testing.T) {
 func TestPickUp(t *testing.T) {
 	ctx := context.Background()
 	cs := &cachestore.Memorystore{}
-	DefaultTestInitialize(ctx, cs)
+	DefaultTestInitialize(t, ctx, cs)
 
 	stored1 := TestEntity{
 		Id:    1,
@@ -668,7 +673,7 @@ func TestPickUp(t *testing.T) {
 func TestGetKeyAll(t *testing.T) {
 	ctx := context.Background()
 	cs := &cachestore.Memorystore{}
-	DefaultTestInitialize(ctx, cs)
+	DefaultTestInitialize(t, ctx, cs)
 
 	stored1 := TestEntity{
 		Id:    1,
@@ -695,7 +700,7 @@ func TestGetKeyAll(t *testing.T) {
 func TestGetKeyFirst(t *testing.T) {
 	ctx := context.Background()
 	cs := &cachestore.Memorystore{}
-	DefaultTestInitialize(ctx, cs)
+	DefaultTestInitialize(t, ctx, cs)
 
 	stored1 := TestEntity{
 		Id:    1,
@@ -720,7 +725,7 @@ func TestGetKeyFirst(t *testing.T) {
 func TestGetKeyFirst_存在しない場合(t *testing.T) {
 	ctx := context.Background()
 	cs := &cachestore.Memorystore{}
-	DefaultTestInitialize(ctx, cs)
+	DefaultTestInitialize(t, ctx, cs)
 
 	stored1 := TestEntity{
 		Id:    1,

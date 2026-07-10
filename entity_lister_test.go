@@ -11,7 +11,7 @@ import (
 
 func TestEntityLister_GetList(t *testing.T) {
 	ctx := context.Background()
-	DefaultTestInitialize(ctx, nil)
+	DefaultTestInitialize(t, ctx, nil)
 
 	err := PutEntityMulti(ctx, []*TestEntity{
 		{Id: 1, Value: "Test1"},
@@ -39,7 +39,7 @@ func TestEntityLister_GetList(t *testing.T) {
 
 func TestEntityLister_WithFilter(t *testing.T) {
 	ctx := context.Background()
-	DefaultTestInitialize(ctx, nil)
+	DefaultTestInitialize(t, ctx, nil)
 
 	err := PutEntityMulti(ctx, []*TestEntity{
 		{Id: 1, Value: "Test1"},
@@ -63,7 +63,7 @@ func TestEntityLister_WithFilter(t *testing.T) {
 
 func TestEntityLister_GetKeyList(t *testing.T) {
 	ctx := context.Background()
-	DefaultTestInitialize(ctx, nil)
+	DefaultTestInitialize(t, ctx, nil)
 
 	err := PutEntityMulti(ctx, []*TestEntity{
 		{Id: 1, Value: "Test1"},

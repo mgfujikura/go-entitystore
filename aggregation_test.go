@@ -10,7 +10,7 @@ import (
 
 func TestCount(t *testing.T) {
 	ctx := context.Background()
-	DefaultTestInitialize(ctx, nil)
+	DefaultTestInitialize(t, ctx, nil)
 
 	err := PutEntityMulti(ctx, []*AggregationTestEntity{
 		{Id: 1, Value: 10},
@@ -27,7 +27,7 @@ func TestCount(t *testing.T) {
 
 func TestAvg(t *testing.T) {
 	ctx := context.Background()
-	DefaultTestInitialize(ctx, nil)
+	DefaultTestInitialize(t, ctx, nil)
 
 	err := PutEntityMulti(ctx, []*AggregationTestEntity{
 		{Id: 1, Value: 10},
@@ -44,7 +44,7 @@ func TestAvg(t *testing.T) {
 
 func TestIntSum(t *testing.T) {
 	ctx := context.Background()
-	DefaultTestInitialize(ctx, nil)
+	DefaultTestInitialize(t, ctx, nil)
 
 	err := PutEntityMulti(ctx, []*AggregationTestEntity{
 		{Id: 1, Value: 10, Value2: 1.5},
@@ -61,7 +61,7 @@ func TestIntSum(t *testing.T) {
 
 func TestFloat64Sum(t *testing.T) {
 	ctx := context.Background()
-	DefaultTestInitialize(ctx, nil)
+	DefaultTestInitialize(t, ctx, nil)
 
 	err := PutEntityMulti(ctx, []*AggregationTestEntity{
 		{Id: 1, Value: 10, Value2: 1.5},
@@ -78,7 +78,7 @@ func TestFloat64Sum(t *testing.T) {
 
 func TestAggregation(t *testing.T) {
 	ctx := context.Background()
-	DefaultTestInitialize(ctx, nil)
+	DefaultTestInitialize(t, ctx, nil)
 
 	err := PutEntityMulti(ctx, []*AggregationTestEntity{
 		{Id: 1, Value: 10, Value2: 1.5},
