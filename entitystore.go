@@ -16,6 +16,9 @@ import (
 // LogFormat はログ出力時のフォーマット文字列です。
 const LogFormat = "[entitystore] %s"
 
+// MultiOpLimit は Datastore の GetMulti / PutMulti / DeleteMulti などの一括操作の上限件数です。
+const MultiOpLimit = 500
+
 // ErrCacheInvalidate は Datastore への変更は成功したが、キャッシュの無効化に失敗したことを表します。
 // Put / Delete / Mutate などで errors.Is(err, ErrCacheInvalidate) により判定できます。
 var ErrCacheInvalidate = errors.New("entitystore: cache invalidation failed")
@@ -149,27 +152,21 @@ func Initialize(ctx context.Context, projectId string, conf Config) {
 }
 
 // DeleteAll は指定された Kind のすべてのエンティティを削除します。
+// キーの取得と削除を MultiOpLimit 件ずつ繰り返します。
 func DeleteAll(ctx context.Context, kind string) error {
-	// クエリで対象の Kind のすべてのキーを取得
-	query := NewQuery(kind).KeysOnly()
-	keys, err := client.GetAll(ctx, query, nil)
-	if err != nil {
-		return err
-	}
-	// Datastore API の制限により、最大500件ずつ削除
-	const batchSize = 500
-	for i := 0; i < len(keys); i += batchSize {
-		end := i + batchSize
-		if end > len(keys) {
-			end = len(keys)
+	q := NewQuery(kind).KeysOnly().Limit(MultiOpLimit)
+	for {
+		keys, err := client.GetAll(ctx, q, nil)
+		if err != nil {
+			return err
 		}
-
-		if err := client.DeleteMulti(ctx, keys[i:end]); err != nil {
+		if len(keys) == 0 {
+			return nil
+		}
+		if err := DeleteMulti(ctx, keys); err != nil {
 			return err
 		}
 	}
-
-	return nil
 }
 
 // GetEntity は単一のエンティティを取得します。
@@ -231,22 +228,24 @@ func DeleteEntityMulti[E Entity](ctx context.Context, es []E) error {
 // キャッシュに存在するエンティティはキャッシュから取得し、存在しないエンティティはDatastoreから取得します。
 // 取得後、Datastoreから取得したエンティティはキャッシュに保存します。
 // クエリやキーはキャッシュしません。毎回Datastoreに問い合わせ、エンティティの取得のみキャッシュを利用します。
+// キーの取得とエンティティの取得は MultiOpLimit 件ずつ行います。
 func GetEntityAll[E Entity](ctx context.Context, q Query, dst *[]E) error {
-	keys, err := client.GetAll(ctx, q.KeysOnly(), nil)
-	if err != nil {
-		return err
+	var zero E
+	lister := NewEntityLister(q, zero)
+	result := make([]E, 0)
+	cur := ""
+	for {
+		ents, nextCur, err := lister.GetList(ctx, MultiOpLimit, cur)
+		if err != nil {
+			return err
+		}
+		result = append(result, ents...)
+		if nextCur == "" {
+			*dst = result
+			return nil
+		}
+		cur = nextCur
 	}
-	if len(keys) == 0 {
-		return nil
-	}
-	*dst = make([]E, len(keys))
-	var e E
-	var constructor = entityConstructor(e)
-	for i := range *dst {
-		(*dst)[i] = constructor()
-	}
-	anys := toAnySlice(*dst)
-	return GetMulti(ctx, keys, anys)
 }
 
 // GetEntityFirst はクエリにマッチする最初のエンティティを取得します。
