@@ -48,8 +48,18 @@ func NewUpsert[E Entity](e E) *Mutation {
 
 // MutateEntity は複数のエンティティに対して変更を適用します。
 // 引数として渡されたMutationのリストに基づいて、Datastoreに対して一括で変更を行います。
+// Insert / Update / Upsert の場合は PutEntity と同様に PrePutAction を実行します。
 // 変更後、キャッシュから該当エンティティを削除します。
+// Datastore への変更に成功しキャッシュの削除に失敗した場合は ErrCacheInvalidate でラップしたエラーを返します。
 func MutateEntity(ctx context.Context, muts ...*Mutation) error {
+	for _, m := range muts {
+		switch m.Type {
+		case MutationTypeInsert, MutationTypeUpdate, MutationTypeUpsert:
+			if err := m.Entity.PrePutAction(ctx); err != nil {
+				return err
+			}
+		}
+	}
 	_, err := client.Mutate(ctx, lo.Map(muts, func(m *Mutation, _ int) *datastore.Mutation {
 		switch m.Type {
 		case MutationTypeDelete:
@@ -67,7 +77,7 @@ func MutateEntity(ctx context.Context, muts ...*Mutation) error {
 	if err != nil {
 		return err
 	}
-	return cache.DeleteEntities(ctx, lo.Map(muts, func(m *Mutation, _ int) datastore.Key {
+	return wrapCacheInvalidate(cache.DeleteEntities(ctx, lo.Map(muts, func(m *Mutation, _ int) datastore.Key {
 		return *m.Key
-	}))
+	})))
 }

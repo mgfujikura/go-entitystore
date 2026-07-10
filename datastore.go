@@ -157,44 +157,56 @@ func GetMulti(ctx context.Context, keys []*datastore.Key, dst []any) error {
 
 // Put は単一のエンティティをDatastoreに保存します。
 // 保存後、キャッシュを削除します。
+// Datastore への保存に成功しキャッシュの削除に失敗した場合は ErrCacheInvalidate でラップしたエラーを返します。
 func Put(ctx context.Context, key *datastore.Key, src any) error {
 	_, err := client.Put(ctx, key, src)
 	if err != nil {
 		return err
 	}
-	return cache.DeleteEntities(ctx, []datastore.Key{*key})
+	return wrapCacheInvalidate(cache.DeleteEntities(ctx, []datastore.Key{*key}))
 }
 
 // PutMulti は複数のエンティティをDatastoreに一括保存します。
 // 保存後、キャッシュを削除します。
+// Datastore への保存に成功しキャッシュの削除に失敗した場合は ErrCacheInvalidate でラップしたエラーを返します。
 func PutMulti(ctx context.Context, keys []*datastore.Key, src any) error {
 	_, err := client.PutMulti(ctx, keys, src)
 	if err != nil {
 		return err
 	}
-	return cache.DeleteEntities(ctx, lo.Map(keys, func(key *datastore.Key, _ int) datastore.Key {
+	return wrapCacheInvalidate(cache.DeleteEntities(ctx, lo.Map(keys, func(key *datastore.Key, _ int) datastore.Key {
 		return *key
-	}))
+	})))
 }
 
 // Delete は単一のエンティティをDatastoreとキャッシュから削除します。
+// Datastore からの削除に成功しキャッシュの削除に失敗した場合は ErrCacheInvalidate でラップしたエラーを返します。
 func Delete(ctx context.Context, key *datastore.Key) error {
 	err := client.Delete(ctx, key)
 	if err != nil {
 		return err
 	}
-	return cache.DeleteEntities(ctx, []datastore.Key{*key})
+	return wrapCacheInvalidate(cache.DeleteEntities(ctx, []datastore.Key{*key}))
 }
 
 // DeleteMulti は複数のエンティティをDatastoreとキャッシュから一括削除します。
+// Datastore からの削除に成功しキャッシュの削除に失敗した場合は ErrCacheInvalidate でラップしたエラーを返します。
 func DeleteMulti(ctx context.Context, keys []*datastore.Key) error {
 	err := client.DeleteMulti(ctx, keys)
 	if err != nil {
 		return err
 	}
-	return cache.DeleteEntities(ctx, lo.Map(keys, func(key *datastore.Key, _ int) datastore.Key {
+	return wrapCacheInvalidate(cache.DeleteEntities(ctx, lo.Map(keys, func(key *datastore.Key, _ int) datastore.Key {
 		return *key
-	}))
+	})))
+}
+
+// wrapCacheInvalidate はキャッシュ無効化のエラーを ErrCacheInvalidate でラップします。
+func wrapCacheInvalidate(err error) error {
+	if err == nil {
+		return nil
+	}
+	return fmt.Errorf("%w: %w", ErrCacheInvalidate, err)
 }
 
 // Run は client.Run のラッパーです。
