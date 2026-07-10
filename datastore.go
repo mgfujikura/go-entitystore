@@ -216,11 +216,3 @@ func wrapCacheInvalidate(err error) error {
 func Run(ctx context.Context, q Query) *datastore.Iterator {
 	return client.Run(ctx, q)
 }
-
-// RunInTransaction は client.RunInTransaction のラッパーです。
-// 特別な処理は行いません。
-//
-//goland:noinspection GoUnusedExportedFunction
-func RunInTransaction(ctx context.Context, f func(tx *datastore.Transaction) error, opts ...datastore.TransactionOption) (cmt *datastore.Commit, err error) {
-	return client.RunInTransaction(ctx, f, opts...)
-}
