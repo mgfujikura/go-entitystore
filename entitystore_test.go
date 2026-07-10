@@ -285,6 +285,14 @@ func TestGetEntityMulti_datastoreとcacheから取得(t *testing.T) {
 	require.Equal(t, stored2.Value, es[1].Value)
 
 	require.Len(t, cs.Cache, 2)
+	// Datastore miss key must be cached with the correct entity contents (not dst[i] mix-up)
+	cached, err := cs.GetEntities(ctx, []datastore.Key{*stored1.Key(), *stored2.Key()})
+	require.NoError(t, err)
+	var fromCache1, fromCache2 TestEntity
+	LoadStruct(cached[*stored1.Key()], &fromCache1)
+	LoadStruct(cached[*stored2.Key()], &fromCache2)
+	require.Equal(t, stored1.Value, fromCache1.Value)
+	require.Equal(t, stored2.Value, fromCache2.Value)
 }
 
 func TestGetEntityMulti_datastoreとcacheから取得し取得出来なかったものもある(t *testing.T) {
@@ -334,6 +342,16 @@ func TestGetEntityMulti_datastoreとcacheから取得し取得出来なかった
 	require.Equal(t, "", es[2].Value)
 
 	require.Len(t, cs.Cache, 2)
+	cached, err := cs.GetEntities(ctx, []datastore.Key{*stored1.Key(), *stored2.Key(), *es[2].Key()})
+	require.NoError(t, err)
+	require.Contains(t, cached, *stored1.Key())
+	require.Contains(t, cached, *stored2.Key())
+	require.NotContains(t, cached, *es[2].Key())
+	var fromCache1, fromCache2 TestEntity
+	LoadStruct(cached[*stored1.Key()], &fromCache1)
+	LoadStruct(cached[*stored2.Key()], &fromCache2)
+	require.Equal(t, stored1.Value, fromCache1.Value)
+	require.Equal(t, stored2.Value, fromCache2.Value)
 }
 
 func TestPutEntity(t *testing.T) {

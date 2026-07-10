@@ -131,7 +131,7 @@ func GetMulti(ctx context.Context, keys []*datastore.Key, dst []any) error {
 				if *keys[p] == *noCacheKeys[i] {
 					if e == nil {
 						dst[p] = noCaches[i]
-						hits[*keys[p]] = EntityToProperties(dst[i])
+						hits[*keys[p]] = EntityToProperties(dst[p])
 						break
 					} else {
 						merr[p] = e
