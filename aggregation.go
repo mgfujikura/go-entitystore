@@ -78,9 +78,11 @@ type Aggregation interface {
 }
 
 type aggregation struct {
-	aq       *datastore.AggregationQuery
-	iResults map[string]int
-	fResults map[string]float64
+	aq        *datastore.AggregationQuery
+	iResults  map[string]int
+	fResults  map[string]float64
+	intKeys   []string
+	floatKeys []string
 }
 
 // NewAggregation コンストラクタ
@@ -94,25 +96,33 @@ func NewAggregation(q Query) Aggregation {
 
 // WithCount はカウント集計を追加します。
 func (a *aggregation) WithCount() Aggregation {
-	a.aq = a.aq.WithCount("count")
+	alias := "count"
+	a.aq = a.aq.WithCount(alias)
+	a.intKeys = append(a.intKeys, alias)
 	return a
 }
 
 // WithAvg は指定フィールドの平均値集計を追加します。
 func (a *aggregation) WithAvg(f string) Aggregation {
-	a.aq = a.aq.WithAvg(f, "avg_"+f)
+	alias := "avg_" + f
+	a.aq = a.aq.WithAvg(f, alias)
+	a.floatKeys = append(a.floatKeys, alias)
 	return a
 }
 
 // WithIntSum は指定フィールドのInt型の合計値集計を追加します。
 func (a *aggregation) WithIntSum(f string) Aggregation {
-	a.aq = a.aq.WithSum(f, "isum_"+f)
+	alias := "isum_" + f
+	a.aq = a.aq.WithSum(f, alias)
+	a.intKeys = append(a.intKeys, alias)
 	return a
 }
 
 // WithFloat64Sum は指定フィールドのFloat64型の合計値集計を追加します。
 func (a *aggregation) WithFloat64Sum(f string) Aggregation {
-	a.aq = a.aq.WithSum(f, "fsum_"+f)
+	alias := "fsum_" + f
+	a.aq = a.aq.WithSum(f, alias)
+	a.floatKeys = append(a.floatKeys, alias)
 	return a
 }
 
@@ -123,12 +133,14 @@ func (a *aggregation) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	for k, v := range ar {
-		cv := v.(*datastorepb.Value)
-		if k[:5] == "isum_" || k == "count" {
-			a.iResults[k] = int(cv.GetIntegerValue())
-		} else if k[:5] == "fsum_" || k[:4] == "avg_" {
-			a.fResults[k] = cv.GetDoubleValue()
+	for _, k := range a.intKeys {
+		if v, ok := ar[k]; ok {
+			a.iResults[k] = int(v.(*datastorepb.Value).GetIntegerValue())
+		}
+	}
+	for _, k := range a.floatKeys {
+		if v, ok := ar[k]; ok {
+			a.fResults[k] = v.(*datastorepb.Value).GetDoubleValue()
 		}
 	}
 	return nil
