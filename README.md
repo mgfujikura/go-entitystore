@@ -14,8 +14,6 @@ GCP を使わないテストです。PR やローカルの日常確認ではこ�
 go test ./... -short
 ```
 
-（ローカルに `aememcachestore/test` がある場合は echo 依存で失敗することがあるため、そのディレクトリは除外してください。）
-
 ### 結合テスト（実 GCP Datastore）
 
 Datastore の実挙動を確認するテストです。`testing.Short()` ではスキップされます。

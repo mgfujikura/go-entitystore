@@ -1,11 +1,11 @@
 package main
 
 import (
+	"log"
 	"net/http"
 	"os"
 	"reflect"
 
-	"github.com/labstack/echo/v4"
 	"github.com/samber/lo"
 )
 
@@ -15,15 +15,23 @@ func main() {
 		port = "8080" // ローカル開発用のデフォルト
 	}
 
-	e := echo.New()
-	e.GET("/", func(c echo.Context) error {
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			http.NotFound(w, r)
+			return
+		}
 		rs, err := Test()
 		if err != nil {
-			return c.HTML(http.StatusInternalServerError, ErrorHtml(err))
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte(ErrorHtml(err)))
+			return
 		}
-		return c.HTML(http.StatusOK, ResultHtml(rs))
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write([]byte(ResultHtml(rs)))
 	})
-	e.Logger.Fatal(e.Start(":" + port))
+
+	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
 
 func ErrorHtml(err error) string {
@@ -34,7 +42,7 @@ func ResultHtml(rs []*TestResult) string {
 	html := lo.Reduce(rs, func(acc string, r *TestResult, _ int) string {
 		return acc + r.Html()
 	}, "")
-	return "<html><head><title>test</title></head></body>" + html + "</body></html>"
+	return "<html><head><title>test</title></head><body>" + html + "</body></html>"
 }
 
 func Test() ([]*TestResult, error) {

@@ -7,6 +7,7 @@ import (
 	"encoding/gob"
 	"encoding/hex"
 	"fmt"
+	"time"
 
 	"cloud.google.com/go/datastore"
 	"google.golang.org/appengine/v2/memcache"
@@ -18,12 +19,21 @@ var SizeLimit = 950 * 1024 // 950KB
 var Prefix = "DatastoreCache:"
 
 // Cachestore は App Engine Memcache を使用した Cachestore の実装です。
+// TTL が 0 の場合は有効期限なしで保存します。
 type Cachestore struct {
 	cachestore.Cachestore
+	TTL time.Duration
 }
 
+// NewCachestore は TTL なしの Cachestore を返します。
 func NewCachestore() Cachestore {
 	return Cachestore{}
+}
+
+// NewCachestoreWithTTL は指定した TTL 付きの Cachestore を返します。
+// ttl が 0 の場合は NewCachestore と同様に有効期限なしです。
+func NewCachestoreWithTTL(ttl time.Duration) Cachestore {
+	return Cachestore{TTL: ttl}
 }
 
 func KeyHash(key datastore.Key) string {
@@ -72,8 +82,9 @@ func (c Cachestore) SetEntities(ctx context.Context, keyValues map[datastore.Key
 			return cachestore.ErrCacheSizeOver
 		}
 		items = append(items, &memcache.Item{
-			Key:   Prefix + KeyHash(key),
-			Value: buf.Bytes(),
+			Key:        Prefix + KeyHash(key),
+			Value:      buf.Bytes(),
+			Expiration: c.TTL,
 		})
 	}
 	return memcache.SetMulti(ctx, items)
