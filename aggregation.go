@@ -33,7 +33,7 @@ func Avg(ctx context.Context, q Query, f string) (float64, error) {
 		cv := c.(*datastorepb.Value)
 		return cv.GetDoubleValue(), nil
 	}
-	return 0, errors.New("no count")
+	return 0, errors.New("no avg")
 }
 
 // IntSum はクエリに一致するエンティティのInt型の指定フィールドの合計値を返します。
@@ -47,7 +47,7 @@ func IntSum(ctx context.Context, q Query, f string) (int, error) {
 		cv := c.(*datastorepb.Value)
 		return int(cv.GetIntegerValue()), nil
 	}
-	return 0, errors.New("no count")
+	return 0, errors.New("no sum")
 }
 
 // Float64Sum はクエリに一致するエンティティのFloat64型の指定フィールドの合計値を返します。
@@ -61,7 +61,7 @@ func Float64Sum(ctx context.Context, q Query, f string) (float64, error) {
 		cv := c.(*datastorepb.Value)
 		return cv.GetDoubleValue(), nil
 	}
-	return 0, errors.New("no count")
+	return 0, errors.New("no sum")
 }
 
 // Aggregation は複数の集計を一度に実行するためのインターフェースです。
@@ -78,17 +78,17 @@ type Aggregation interface {
 }
 
 type aggregation struct {
-	aq      *datastore.AggregationQuery
-	iresuts map[string]int
-	fresuts map[string]float64
+	aq       *datastore.AggregationQuery
+	iResults map[string]int
+	fResults map[string]float64
 }
 
 // NewAggregation コンストラクタ
 func NewAggregation(q Query) Aggregation {
 	return &aggregation{
-		aq:      q.NewAggregationQuery(),
-		iresuts: make(map[string]int),
-		fresuts: make(map[string]float64),
+		aq:       q.NewAggregationQuery(),
+		iResults: make(map[string]int),
+		fResults: make(map[string]float64),
 	}
 }
 
@@ -126,9 +126,9 @@ func (a *aggregation) Run(ctx context.Context) error {
 	for k, v := range ar {
 		cv := v.(*datastorepb.Value)
 		if k[:5] == "isum_" || k == "count" {
-			a.iresuts[k] = int(cv.GetIntegerValue())
+			a.iResults[k] = int(cv.GetIntegerValue())
 		} else if k[:5] == "fsum_" || k[:4] == "avg_" {
-			a.fresuts[k] = cv.GetDoubleValue()
+			a.fResults[k] = cv.GetDoubleValue()
 		}
 	}
 	return nil
@@ -136,20 +136,20 @@ func (a *aggregation) Run(ctx context.Context) error {
 
 // Count はカウント集計の結果を返します。
 func (a *aggregation) Count() int {
-	return a.iresuts["count"]
+	return a.iResults["count"]
 }
 
 // Avg は指定フィールドの平均値集計の結果を返します。
 func (a *aggregation) Avg(f string) float64 {
-	return a.fresuts["avg_"+f]
+	return a.fResults["avg_"+f]
 }
 
 // IntSum は指定フィールドのInt型の合計値集計の結果を返します。
 func (a *aggregation) IntSum(f string) int {
-	return a.iresuts["isum_"+f]
+	return a.iResults["isum_"+f]
 }
 
 // Float64Sum は指定フィールドのFloat64型の合計値集計の結果を返します。
 func (a *aggregation) Float64Sum(f string) float64 {
-	return a.fresuts["fsum_"+f]
+	return a.fResults["fsum_"+f]
 }

@@ -26,16 +26,12 @@ type Query interface {
 
 type query struct {
 	*datastore.Query
-	isKeysOnly bool
 }
 
 func NewQuery(kind string) Query {
-	var q Query
-	q = &query{
-		datastore.NewQuery(kind),
-		false,
+	return &query{
+		Query: datastore.NewQuery(kind),
 	}
-	return q
 }
 
 func (q query) Ancestor(ancestor *datastore.Key) Query {
@@ -96,7 +92,6 @@ func (q query) DistinctOn(fieldNames ...string) Query {
 
 func (q query) KeysOnly() Query {
 	q.Query = q.Query.KeysOnly()
-	q.isKeysOnly = true
 	return q
 }
 

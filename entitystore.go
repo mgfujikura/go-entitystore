@@ -16,6 +16,10 @@ import (
 // LogFormat はログ出力時のフォーマット文字列です。
 const LogFormat = "[entitystore] %s"
 
+// ErrCacheInvalidate は Datastore への変更は成功したが、キャッシュの無効化に失敗したことを表します。
+// Put / Delete / Mutate などで errors.Is(err, ErrCacheInvalidate) により判定できます。
+var ErrCacheInvalidate = errors.New("entitystore: cache invalidation failed")
+
 // client は Datastore クライアントのインスタンスです。
 var client DatastoreClient
 

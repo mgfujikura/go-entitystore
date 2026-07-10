@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"cloud.google.com/go/datastore"
 	"github.com/samber/lo"
@@ -27,7 +28,8 @@ func Get(ctx context.Context, key *datastore.Key, dst any) error {
 	} else {
 		// キャッシュのエラーは警告ログを出すだけにする
 		logger.Warn(
-			fmt.Sprintf(LogFormat, "GetEntity cache.GetEntities error: %v"),
+			fmt.Sprintf(LogFormat, "Get cache.GetEntities error"),
+			slog.String("error", err.Error()),
 		)
 	}
 	// キャッシュから取得出来なければ Datastore から取得
@@ -45,7 +47,8 @@ func Get(ctx context.Context, key *datastore.Key, dst any) error {
 	if err != nil {
 		// キャッシュのエラーは警告ログを出すだけにする
 		logger.Warn(
-			fmt.Sprintf(LogFormat, "GetEntity cache.SetEntities error: %v"),
+			fmt.Sprintf(LogFormat, "Get cache.SetEntities error"),
+			slog.String("error", err.Error()),
 		)
 	}
 	return nil
@@ -74,7 +77,8 @@ func GetMulti(ctx context.Context, keys []*datastore.Key, dst []any) error {
 	} else {
 		// キャッシュのエラーは警告ログを出すだけにする
 		logger.Warn(
-			fmt.Sprintf(LogFormat, "GetEntityMulti cache.GetEntities error: %v"),
+			fmt.Sprintf(LogFormat, "GetMulti cache.GetEntities error"),
+			slog.String("error", err.Error()),
 		)
 	}
 	noerr := false
@@ -141,7 +145,8 @@ func GetMulti(ctx context.Context, keys []*datastore.Key, dst []any) error {
 	if cacheErr != nil {
 		// キャッシュのエラーは警告ログを出すだけにする
 		logger.Warn(
-			fmt.Sprintf(LogFormat, "GetEntityMulti cache.SetEntities error: %v"),
+			fmt.Sprintf(LogFormat, "GetMulti cache.SetEntities error"),
+			slog.String("error", cacheErr.Error()),
 		)
 	}
 	if noerr {
