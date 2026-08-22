@@ -16,8 +16,14 @@ import (
 // LogFormat はログ出力時のフォーマット文字列です。
 const LogFormat = "[entitystore] %s"
 
-// MultiOpLimit は Datastore の GetMulti / PutMulti / DeleteMulti などの一括操作の上限件数です。
+// MultiOpLimit は DeleteAll や GetEntityAll などが内部で一度に処理する件数です。
+// Datastore の GetMulti / PutMulti / DeleteMulti 自体の件数制限ではありません。
 const MultiOpLimit = 500
+
+// DatastoreMultiLimit は Datastore の GetMulti / PutMulti / DeleteMulti の
+// 1リクエストあたりの上限件数です。
+// entitystore の GetMulti / PutMulti / DeleteMulti はこの件数ずつに分割して実行します。
+const DatastoreMultiLimit = 1000
 
 // ErrCacheInvalidate は Datastore への変更は成功したが、キャッシュの無効化に失敗したことを表します。
 // Put / Delete / Mutate などで errors.Is(err, ErrCacheInvalidate) により判定できます。
@@ -179,6 +185,7 @@ func GetEntity[E Entity](ctx context.Context, e E) error {
 // GetEntityMulti は複数のエンティティを一括取得します。
 // キャッシュに存在するエンティティはキャッシュから取得し、存在しないエンティティはDatastoreから取得します。
 // 取得後、Datastoreから取得したエンティティはキャッシュに保存します。
+// DatastoreMultiLimit 件を超える場合は複数リクエストに分割して処理します。
 func GetEntityMulti[E Entity](ctx context.Context, es []E) error {
 	keys := lo.Map(es, func(e E, _ int) *datastore.Key {
 		return e.Key()
@@ -199,6 +206,7 @@ func PutEntity[E Entity](ctx context.Context, e E) error {
 
 // PutEntityMulti は複数のエンティティを一括保存します。
 // 保存後、キャッシュを削除します。
+// DatastoreMultiLimit 件を超える場合は複数リクエストに分割して処理します。
 func PutEntityMulti[E Entity](ctx context.Context, es []E) error {
 	var keys []*datastore.Key
 	for _, e := range es {
@@ -217,6 +225,7 @@ func DeleteEntity[E Entity](ctx context.Context, e E) error {
 }
 
 // DeleteEntityMulti は複数のエンティティをDatastoreとキャッシュから一括削除します。
+// DatastoreMultiLimit 件を超える場合は複数リクエストに分割して処理します。
 func DeleteEntityMulti[E Entity](ctx context.Context, es []E) error {
 	return DeleteMulti(ctx, lo.Map(es, func(e E, _ int) *datastore.Key {
 		return e.Key()

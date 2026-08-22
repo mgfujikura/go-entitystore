@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"reflect"
 
 	"cloud.google.com/go/datastore"
 	"github.com/samber/lo"
@@ -57,7 +58,18 @@ func Get(ctx context.Context, key *datastore.Key, dst any) error {
 // GetMulti は複数のエンティティを取得します。
 // キャッシュに存在するエンティティはキャッシュから取得し、存在しないエンティティはDatastoreから取得します。
 // 取得後、Datastoreから取得したエンティティはキャッシュに保存します。
+// DatastoreMultiLimit 件を超える場合は複数リクエストに分割して処理します。
 func GetMulti(ctx context.Context, keys []*datastore.Key, dst []any) error {
+	if len(keys) != len(dst) {
+		return errors.New("entitystore: key and dst slices have different length")
+	}
+	return chunkedMulti(len(keys), DatastoreMultiLimit, func(start, end int) error {
+		return getMulti(ctx, keys[start:end], dst[start:end])
+	})
+}
+
+// getMulti は GetMulti の1リクエスト分の処理です。
+func getMulti(ctx context.Context, keys []*datastore.Key, dst []any) error {
 	// キャッシュから取得
 	cacheKeys := lo.Map(keys, func(key *datastore.Key, _ int) datastore.Key {
 		return *key
@@ -169,7 +181,28 @@ func Put(ctx context.Context, key *datastore.Key, src any) error {
 // PutMulti は複数のエンティティをDatastoreに一括保存します。
 // 保存後、キャッシュを削除します。
 // Datastore への保存に成功しキャッシュの削除に失敗した場合は ErrCacheInvalidate でラップしたエラーを返します。
+// DatastoreMultiLimit 件を超える場合は複数リクエストに分割して処理します。
 func PutMulti(ctx context.Context, keys []*datastore.Key, src any) error {
+	if len(keys) == 0 {
+		return nil
+	}
+	if len(keys) <= DatastoreMultiLimit {
+		return putMulti(ctx, keys, src)
+	}
+	srcVal := reflect.ValueOf(src)
+	if srcVal.Kind() != reflect.Slice {
+		return fmt.Errorf("entitystore: src has type %T; want a slice", src)
+	}
+	if srcVal.Len() != len(keys) {
+		return errors.New("entitystore: key and src slices have different length")
+	}
+	return chunkedMulti(len(keys), DatastoreMultiLimit, func(start, end int) error {
+		return putMulti(ctx, keys[start:end], srcVal.Slice(start, end).Interface())
+	})
+}
+
+// putMulti は PutMulti の1リクエスト分の処理です。
+func putMulti(ctx context.Context, keys []*datastore.Key, src any) error {
 	_, err := client.PutMulti(ctx, keys, src)
 	if err != nil {
 		return err
@@ -191,7 +224,15 @@ func Delete(ctx context.Context, key *datastore.Key) error {
 
 // DeleteMulti は複数のエンティティをDatastoreとキャッシュから一括削除します。
 // Datastore からの削除に成功しキャッシュの削除に失敗した場合は ErrCacheInvalidate でラップしたエラーを返します。
+// DatastoreMultiLimit 件を超える場合は複数リクエストに分割して処理します。
 func DeleteMulti(ctx context.Context, keys []*datastore.Key) error {
+	return chunkedMulti(len(keys), DatastoreMultiLimit, func(start, end int) error {
+		return deleteMulti(ctx, keys[start:end])
+	})
+}
+
+// deleteMulti は DeleteMulti の1リクエスト分の処理です。
+func deleteMulti(ctx context.Context, keys []*datastore.Key) error {
 	err := client.DeleteMulti(ctx, keys)
 	if err != nil {
 		return err
